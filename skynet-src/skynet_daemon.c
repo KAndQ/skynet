@@ -25,9 +25,9 @@
 #include "skynet_daemon.h"
 
 /**
- * 检测 pidfile 里面配置的 pid 是否可用
- * @param pidfile 配置守护进程的文件
- * @return 如果可用, 则返回配置的 pid, 否则返回 0
+ * 读取 pidfile 内的内容
+ * @param pidfile 读取文件的文件名
+ * @return 得到 pidfile 中的 pid, 无效的返回 0
  */
 static int
 check_pid(const char *pidfile) {
@@ -55,7 +55,9 @@ check_pid(const char *pidfile) {
 }
 
 /**
- * 
+ * 正常情况下的操作是打开 pidfile 文件, 然后锁定该文件, 并且将当前的进程的 pid 写入.
+ * @param pidfile 操作的文件
+ * @return 正常操作返回当前进程的 pid, 否则返回 0
  */
 static int 
 write_pid(const char *pidfile) {
@@ -71,13 +73,16 @@ write_pid(const char *pidfile) {
 		return 0;
 	}
 
-	// 
+	// fdopen取一个现存的文件描述符（我们可能从 open, dup, dup2, fcntl 或 pipe 函数得到此文件描述符），并使一个标准的 I/O 流与该描述符相结合。
+	// 此函数常用于由创建管道和网络通信通道函数获得的描述符。
+	// 因为这些特殊类型的文件不能用标准 I/O fopen 函数打开，首先必须先调用设备专用函数以获得一个文件描述符，然后用 fdopen 使一个标准 I/O 流与该描述符相结合。
 	f = fdopen(fd, "r+");
 	if (f == NULL) {
 		fprintf(stderr, "Can't open %s.\n", pidfile);
 		return 0;
 	}
 
+	// flock()会依参数operation所指定的方式对参数fd所指的文件做各种锁定或解除锁定的动作。此函数只能锁定整个文件，无法锁定文件的某一区域。 
 	if (flock(fd, LOCK_EX|LOCK_NB) == -1) {
 		int n = fscanf(f, "%d", &pid);
 		fclose(f);
@@ -90,11 +95,14 @@ write_pid(const char *pidfile) {
 	}
 	
 	pid = getpid();
-	if (!fprintf(f,"%d\n", pid)) {
+	int ret = fprintf(f, "%d\n", pid)
+	if (ret == 0 && ret == -1) {
 		fprintf(stderr, "Can't write pid.\n");
 		close(fd);
 		return 0;
 	}
+
+	// 清除读写缓冲区，需要立即把输出缓冲区的数据进行物理写入时
 	fflush(f);
 
 	return pid;
@@ -103,6 +111,7 @@ write_pid(const char *pidfile) {
 /**
  * 守护进程初始化
  * @param pidfile 配置守护进程的文件
+ * @return 初始化成功返回 0, 否则返回 1
  */
 int
 daemon_init(const char *pidfile) {
@@ -130,7 +139,17 @@ daemon_init(const char *pidfile) {
 	return 0;
 }
 
+/**
+ * 守护进程退出
+ * @param pidfile 配置守护进程的文件
+ * @return 成功返回 0, 否则返回 -1
+ */
 int 
 daemon_exit(const char *pidfile) {
+	// 函数功能：删除一个文件的目录项并减少它的链接数，若成功则返回0，否则返回-1，错误原因存于errno。
+	// 如果想通过调用这个函数来成功删除文件，你就必须拥有这个文件的所属目录的写和执行权限。
+
+	// unlink()会删除参数pathname指定的文件。如果该文件名为最后连接点，但有其他进程打开了此文件，则在所有关于此文件的文件描述词皆关闭后才会删除。
+	// 如果参数pathname为一符号连接，则此连接会被删除。
 	return unlink(pidfile);
 }
