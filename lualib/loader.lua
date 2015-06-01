@@ -1,3 +1,11 @@
+-- 这个文件用于 config 中的 lualoader 配置项, 由这段代码解析服务名称，进一步加载 lua 代码。
+-- snlua 会将下面几个配置项取出:
+-- SERVICE_NAME 第一个参数，通常是服务名。
+-- LUA_PATH config 文件中配置的 lua_path。
+-- LUA_CPATH config 文件中配置的 lua_cpath。
+-- LUA_PRELOAD config 文件中配置的 preload。
+-- LUA_SERVICE config 文件中配置的 luaservice。
+
 local args = {}
 for word in string.gmatch(..., "%S+") do
 	table.insert(args, word)
