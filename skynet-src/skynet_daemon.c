@@ -117,6 +117,7 @@ int
 daemon_init(const char *pidfile) {
 	int pid = check_pid(pidfile);
 
+	// 如果读出了值, 那么说明当前有进程已经正在占用这个文件. 也可以理解为当前配置的 skynet 进程已经启动了.
 	if (pid) {
 		fprintf(stderr, "Skynet is already running, pid = %d.\n", pid);
 		return 1;
