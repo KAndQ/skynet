@@ -339,6 +339,7 @@ uint32_t
 skynet_queryname(struct skynet_context * context, const char * name) {
 	switch(name[0]) {
 	case ':':
+		// 将字符串转换成无符号长整型数
 		return strtoul(name+1,NULL,16);
 	case '.':
 		return skynet_handle_findname(name + 1);
