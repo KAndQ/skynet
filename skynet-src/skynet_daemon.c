@@ -126,6 +126,15 @@ daemon_init(const char *pidfile) {
 #ifdef __APPLE__
 	fprintf(stderr, "'daemon' is deprecated: first deprecated in OS X 10.5 , use launchd instead.\n");
 #else
+	
+	// http://blog.chinaunix.net/uid-20196318-id-94985.html
+	// daemon()函数主要用于希望脱离控制台，以守护进程形式在后台运行的程序。
+	// 当nochdir为0时，daemon将更改进程的根目录为root(“/”)。
+	// 当noclose为0是，daemon将进程的 stdin, stdout, stderr 都重定向到/dev/null。
+
+	// 如何杀死这样的进程：
+	// 通过ps+grep找到对应的后台进程，使用kill命令将进程杀死；也可创建shell脚本对进程的启动、关闭、重启进行自动管理，参考下文：
+	// http://blog168.chinaunix.net/space.php?uid=20196318&do=blog&id=28824
 	if (daemon(1,0)) {
 		fprintf(stderr, "Can't daemonize.\n");
 		return 1;
