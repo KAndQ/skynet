@@ -11,11 +11,13 @@
 #define DEFAULT_SLOT_SIZE 4
 #define MAX_SLOT_SIZE 0x40000000
 
+// 为了 handle 和 name 相互查询的数据结构
 struct handle_name {
 	char * name;
 	uint32_t handle;
 };
 
+// 
 struct handle_storage {
 	struct rwlock lock;
 
