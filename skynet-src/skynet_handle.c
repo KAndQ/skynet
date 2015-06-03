@@ -17,18 +17,18 @@ struct handle_name {
 	uint32_t handle;
 };
 
-// 
+// handle 的管理器
 struct handle_storage {
-	struct rwlock lock;
+	struct rwlock lock;		// 线程锁
 
-	uint32_t harbor;
-	uint32_t handle_index;
-	int slot_size;
-	struct skynet_context ** slot;
+	uint32_t harbor;		// 当前进程(节点)的 harbor
+	uint32_t handle_index;	// 当前可用的 slot 索引
+	int slot_size;			// 当前 slot 的大小
+	struct skynet_context ** slot;	// 存储 skynet_context 指针的数组, 例: struct skynet_context * slot[DEFAULT_SLOT_SIZE];
 	
-	int name_cap;
-	int name_count;
-	struct handle_name *name;
+	int name_cap;			// 能够存储 handle_name 数据的上限大小
+	int name_count;			// 表示已经存储 handle_name 的数量
+	struct handle_name *name;	// 存储 handle_name 数据结构的数组, 例: struct handle_name name[2];
 };
 
 static struct handle_storage *H = NULL;
