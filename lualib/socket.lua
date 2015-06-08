@@ -7,7 +7,8 @@ local socket = {}	-- api
 local buffer_pool = {}	-- store all message buffer object
 local socket_pool = setmetatable( -- store all socket object
 	{},
-	{ __gc = function(p)
+	{ __gc = function(p)		-- 在进行垃圾回收的时候会调用该方法
+		-- 关闭掉当前所有的 socket
 		for id,v in pairs(p) do
 			driver.close(id)
 			-- don't need clear v.buffer, because buffer pool will be free at the end
@@ -19,6 +20,9 @@ local socket_pool = setmetatable( -- store all socket object
 
 local socket_message = {}
 
+-- 唤醒 socket 所关联的 coroutine.
+-- @param s socket 对象
+-- @return nil
 local function wakeup(s)
 	local co = s.co
 	if co then
@@ -27,10 +31,16 @@ local function wakeup(s)
 	end
 end
 
+-- 将 s 当前所在的 coroutine 挂起.
+-- @param s socket 对象
+-- @return nil
 local function suspend(s)
 	assert(not s.co)
-	s.co = coroutine.running()
-	skynet.wait()
+	s.co = coroutine.running()	-- 得到当前的 coroutine.
+	skynet.wait()	-- 把当前的 coroutine 挂起
+
+	-- 在每次挂起的时候, 唤醒 closing 的 coroutine.
+	-- 因为 socket.close() 方法将等待最后的 socket 缓存数据操作, 直到清空缓存数据.
 	-- wakeup closing corouting every time suspend,
 	-- because socket.close() will wait last socket buffer operation before clear the buffer.
 	if s.closing then
@@ -133,6 +143,7 @@ socket_message[6] = function(id, size, data, address)
 	s.callback(str, address)
 end
 
+-- 注册 socket 消息类型
 skynet.register_protocol {
 	name = "socket",
 	id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6
@@ -165,6 +176,10 @@ local function connect(id, func)
 	end
 end
 
+-- 建立一个 TCP 连接。返回一个数字 id。
+-- @param addr 连接主机的地址
+-- @param port 连接主机的端口
+-- @return 返回一个数字 id.
 function socket.open(addr, port)
 	local id = driver.connect(addr,port)
 	return connect(id)
@@ -196,6 +211,10 @@ function socket.shutdown(id)
 	end
 end
 
+-- 关闭一个连接，这个 API 有可能阻塞住执行流。
+-- 因为如果有其它 coroutine 正在阻塞读这个 id 对应的连接，会先驱使读操作结束，close 操作才返回。
+-- @param id 已经建立连接的 id
+-- @return nil
 function socket.close(id)
 	local s = socket_pool[id]
 	if s == nil then

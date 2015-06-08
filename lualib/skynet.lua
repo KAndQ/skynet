@@ -11,9 +11,9 @@ local profile = require "profile"
 coroutine.resume = profile.resume
 coroutine.yield = profile.yield
 
-local proto = {}
+local proto = {}	-- 用于注册 [协议字符串] 和 [注册协议ID] 的映射表.
 local skynet = {
-	-- read skynet.h
+	-- read skynet.h, 参考 skynet.h 的消息类别定义
 	PTYPE_TEXT = 0,
 	PTYPE_RESPONSE = 1,
 	PTYPE_MULTICAST = 2,
@@ -31,18 +31,44 @@ local skynet = {
 -- code cache
 skynet.cache = require "skynet.codecache"
 
+--[===[
+例如你可以注册一个以文本方式编码消息的消息类别。通常用 C 编写的服务更容易解析文本消息。
+skynet 已经定义了这种消息类别为 skynet.PTYPE_TEXT，但默认并没有注册到 lua 中使用。
+
+class = {
+  name = "text",
+  id = skynet.PTYPE_TEXT,
+  pack = function(m) return tostring(m) end,
+  unpack = skynet.tostring,
+  dispatch = dispatch,	-- 下面说到的 dispatch 函数.
+}
+
+新的类别必须提供 pack 和 unpack 函数，用于消息的编码和解码。
+
+pack 函数必须返回一个 string 或是一个 userdata 和 size。
+在 Lua 脚本中，推荐你返回 string 类型，而用后一种形式需要对 skynet 底层有足够的了解（采用它多半是因为性能考虑，可以减少一些数据拷贝）。
+
+unpack 函数接收一个 lightuserdata 和一个整数 。即上面提到的 message 和 size。
+lua 无法直接处理 C 指针，所以必须使用额外的 C 库导入函数来解码。skynet.tostring 就是这样的一个函数，它将这个 C 指针和长度翻译成 lua 的 string。
+
+接下来你可以使用 skynet.dispatch 注册 text 类别的处理方法了。当然，直接在 skynet.register_protocol 时传入 dispatch 函数也可以。
+
+--]===]
+-- 在 skynet 中注册新的消息类别.
+-- @param class 里面的字段参考上面的注释
+-- @return nil
 function skynet.register_protocol(class)
 	local name = class.name
 	local id = class.id
-	assert(proto[name] == nil)
-	assert(type(name) == "string" and type(id) == "number" and id >=0 and id <=255)
+	assert(proto[name] == nil)	-- 保证之前没有注册过
+	assert(type(name) == "string" and type(id) == "number" and id >=0 and id <= 255)	-- 保证类型正确, 并且值有效
 	proto[name] = class
 	proto[id] = class
 end
 
-local session_id_coroutine = {}
-local session_coroutine_id = {}
-local session_coroutine_address = {}
+local session_id_coroutine = {}			-- session 和 coroutine 的映射关系表
+local session_coroutine_id = {}			-- coroutine 和 session 的映射关系表
+local session_coroutine_address = {}	-- coroutine 和 address(source) 的映射关系表
 local session_response = {}
 local unresponse = {}
 
