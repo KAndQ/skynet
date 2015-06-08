@@ -1,3 +1,6 @@
+-- socket 相关的 lua 接口.
+-- 有些 lua 接口是对 socketdriver 的封装, 有些是对 coroutine 的操作.
+
 local driver = require "socketdriver"
 local skynet = require "skynet"
 local skynet_core = require "skynet.core"
@@ -5,7 +8,7 @@ local assert = assert
 
 local socket = {}	-- api
 local buffer_pool = {}	-- store all message buffer object
-local socket_pool = setmetatable( -- store all socket object
+local socket_pool = setmetatable( -- store all socket object, 存储着所有的 socket 对象, 键是 socket 的 id.
 	{},
 	{ __gc = function(p)		-- 在进行垃圾回收的时候会调用该方法
 		-- 关闭掉当前所有的 socket
@@ -153,6 +156,10 @@ skynet.register_protocol {
 	end
 }
 
+-- 当本机的 socket 与一个远端 socket 连接的时候, 数据的初始化.
+-- @param id id
+-- @param func socket.start 的 accept 回调, 侦听的 socket 有连接接入的时候, 都会调用这个函数.
+-- @return nil
 local function connect(id, func)
 	local newbuffer
 	if func == nil then
@@ -185,6 +192,7 @@ function socket.open(addr, port)
 	return connect(id)
 end
 
+-- 
 function socket.bind(os_fd)
 	local id = driver.bind(os_fd)
 	return connect(id)
@@ -345,9 +353,14 @@ function socket.listen(host, port, backlog)
 	return driver.listen(host, port, backlog)
 end
 
+-- 挂起 id 对应的 socket 所在的 coroutine.
+-- @param id socket id
+-- @return nil
 function socket.lock(id)
 	local s = socket_pool[id]
 	assert(s)
+
+	-- 这里的 lock_set 是一个队列数据结构, lock 和 unlock 必须是成对的.
 	local lock_set = s.lock
 	if not lock_set then
 		lock_set = {}
@@ -362,6 +375,9 @@ function socket.lock(id)
 	end
 end
 
+-- 唤醒 id 之前挂起的 coroutine.
+-- @param id socket id
+-- @return nil
 function socket.unlock(id)
 	local s = socket_pool[id]
 	assert(s)

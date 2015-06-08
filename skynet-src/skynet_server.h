@@ -12,6 +12,12 @@ struct skynet_context * skynet_context_new(const char * name, const char * parm)
 void skynet_context_grab(struct skynet_context *);
 void skynet_context_reserve(struct skynet_context *ctx);
 struct skynet_context * skynet_context_release(struct skynet_context *);
+
+/**
+ * 获得 skynet_context 的 handle
+ * @param skynet_handel
+ * @return handle
+ */
 uint32_t skynet_context_handle(struct skynet_context *);
 int skynet_context_push(uint32_t handle, struct skynet_message *message);
 void skynet_context_send(struct skynet_context * context, void * msg, size_t sz, uint32_t source, int type, int session);
