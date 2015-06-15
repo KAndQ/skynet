@@ -17,52 +17,81 @@ struct handle_name {
 	uint32_t handle;
 };
 
-// handle 的管理器
+// handle 的管理器, 管理进程(节点) context/handle/name 之间的关联
 struct handle_storage {
 	struct rwlock lock;		// 线程锁
 
 	uint32_t harbor;		// 当前进程(节点)的 harbor
-	uint32_t handle_index;	// 当前可用的 slot 索引
+	uint32_t handle_index;	// 当前可用的 slot 索引, 从 1 初始化, handle_index 永远都是增加的, 所以可以保证 handle_index 永远不为 0, 但是通过位操作, 可以保证得到的索引为 0.
 	int slot_size;			// 当前 slot 的大小
-	struct skynet_context ** slot;	// 存储 skynet_context 指针的数组, 例: struct skynet_context * slot[DEFAULT_SLOT_SIZE];
+	struct skynet_context ** slot;	// 存储 skynet_context 指针的数组, 例: struct skynet_context * slot[DEFAULT_SLOT_SIZE]
 	
 	int name_cap;			// 能够存储 handle_name 数据的上限大小
 	int name_count;			// 表示已经存储 handle_name 的数量
 	struct handle_name *name;	// 存储 handle_name 数据结构的数组, 例: struct handle_name name[2];
 };
-
 static struct handle_storage *H = NULL;
 
 uint32_t
 skynet_handle_register(struct skynet_context *ctx) {
 	struct handle_storage *s = H;
 
+	// 线程上锁
 	rwlock_wlock(&s->lock);
 	
-	for (;;) {
+	for (;;) {	// 注意, 这里是一个无限循环, 必须拿到一个可用的 handle
 		int i;
+
+		// 从头开始循环遍历
 		for (i=0;i<s->slot_size;i++) {
-			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;
-			int hash = handle & (s->slot_size-1);
+			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;	// 获得从右到左 3 个字节的数据, 最左的 4 个字节用来表示 harbor
+			int hash = handle & (s->slot_size-1);					// 获得实际的索引, hash 的值不超出 slot_size 的范围
+
+			// 当有可用的 slot 放入 ctx
 			if (s->slot[hash] == NULL) {
+
+				// 记录注册的 ctx
 				s->slot[hash] = ctx;
+
+				// handle_index 自增
 				s->handle_index = handle + 1;
 
+				// 已经存储了 ctx 了, 可以解锁让其他线程使用了
 				rwlock_wunlock(&s->lock);
 
+				// 新的 handle 需要使用最左边的第 4 个字节记录当前 handle 所属的 harbor
 				handle |= s->harbor;
 				return handle;
 			}
 		}
+
+		// 如果没有可用的空间, 扩展容量
 		assert((s->slot_size*2 - 1) <= HANDLE_MASK);
+
+		// 申请新的内存空间
 		struct skynet_context ** new_slot = skynet_malloc(s->slot_size * 2 * sizeof(struct skynet_context *));
+
+		// 重置内存数据
 		memset(new_slot, 0, s->slot_size * 2 * sizeof(struct skynet_context *));
+
+		// 将原来的内容进行复制
 		for (i=0;i<s->slot_size;i++) {
-			int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
+			int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);	// 获得在当前分配的空间中可用的索引, 注意这里是使用  (slot_size * 2 - 1) 在进行为操作.
 			assert(new_slot[hash] == NULL);
+
+			// 这里为什么不是直接 new_slot[i] = s->slot[i] 呢, 而要绕个弯拿到 hash, 然后 new_slot[hash] = s->slot[i]
+			// 解答, 很有意思的小细节:
+			// 首先说 handle_index 从 1 开始计数, 而且都是不断的增加, 返回的时候使用的是 return handle |= s->harbor; 这就决定了返回值不会为 0
+			// 在上面的查询 slot, 并且分配 handle 的过程中, 索引是 hash, 返回值是 handle, handle 可以大于 slot_size.
+			// 这里获得的 hash 可以是大于 slot_size 的, 那么现在可以举例: hash = 4, i = 0
+			// new_slot[4] = s->slot[0]
 			new_slot[hash] = s->slot[i];
 		}
+
+		// 释放之前的数据
 		skynet_free(s->slot);
+
+		// 记录新的数据
 		s->slot = new_slot;
 		s->slot_size *= 2;
 	}
