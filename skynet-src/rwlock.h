@@ -1,7 +1,7 @@
 #ifndef SKYNET_RWLOCK_H
 #define SKYNET_RWLOCK_H
 
-// 读写锁的数据结构
+// 读写锁的数据结构, 这个 <读> 锁可以嵌套, 但是 [写] 锁不能嵌套.
 struct rwlock {
 	int write;		// 写的计数统计
 	int read;		// 读的计数统计

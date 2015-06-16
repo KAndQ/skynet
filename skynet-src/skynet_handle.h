@@ -15,14 +15,14 @@ struct skynet_context;
 uint32_t skynet_handle_register(struct skynet_context *);
 
 /**
- * 回收 handle, 即删掉 handle 对应的 context
+ * 回收 handle, 即删掉 handle 对应的 context, 此 handle 又可重用
  * @param handle 准备回收的 handle
  * @return 收回成功返回 1, 否则返回 0
  */
 int skynet_handle_retire(uint32_t handle);
 
 /**
- * 获得 handle 对应的 skynet_context 对象
+ * 获得 handle 对应的 skynet_context 对象, 同时该 context 的引用计数 +1
  * @param handle 待查询的 handle
  * @return skynet_context
  */
@@ -41,7 +41,7 @@ void skynet_handle_retireall();
 uint32_t skynet_handle_findname(const char * name);
 
 /**
- * 将 name 和 handle 关联起来
+ * 将 name 和 handle 关联起来, 1 个 name 只能注册 1 次, 1 个 handle 能够注册多个名字
  * @param handle handle
  * @param name name
  * @return name
