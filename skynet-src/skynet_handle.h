@@ -7,10 +7,12 @@
 
 struct skynet_context;
 
+// handle 是一个高 8 位表示 harbor, 其他 24 位表示其 index. 0 index 被保留.
+
 /**
  * 注册一个 skynet_context 到当前的进程(节点)中
  * @param skynet_context 注册的 context
- * @return 返回注册的 skynet_context 的 handle
+ * @return 返回注册的 skynet_context 的 handle !!!
  */
 uint32_t skynet_handle_register(struct skynet_context *);
 

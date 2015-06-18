@@ -11,12 +11,16 @@
 #include "skynet_imp.h"
 #include "skynet_log.h"
 
+// POSIX线程（POSIX threads），简称 pthreads，是线程的 POSIX 标准。该标准定义了创建和操纵线程的一整套API。
+// 在类Unix操作系统（Unix、Linux、Mac OS X等）中，都使用 pthreads 作为操作系统的线程。
 #include <pthread.h>
 
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+
+// C99 才有的 C 里面有 bool 类型
 #include <stdbool.h>
 
 #ifdef CALLING_CHECK
@@ -36,25 +40,25 @@
 #endif
 
 struct skynet_context {
-	void * instance;
-	struct skynet_module * mod;
-	void * cb_ud;
-	skynet_cb cb;
-	struct message_queue *queue;
-	FILE * logfile;
+	void * instance;				// 创建的实例
+	struct skynet_module * mod;		// 关联的模块
+	void * cb_ud;					// 回调的参数
+	skynet_cb cb;					// 回调的参数
+	struct message_queue *queue;	// 对应的消息队列
+	FILE * logfile;					// 输出信息的 log 文件
 	char result[32];
-	uint32_t handle;
+	uint32_t handle;				// skynet_handle 的 handle
 	int session_id;
-	int ref;
-	bool init;
-	bool endless;
+	int ref;						// 引用计数
+	bool init;						// 是否初始化
+	bool endless;					// 
 
 	CHECKCALLING_DECL
 };
 
 struct skynet_node {
-	int total;
-	int init;
+	int total;						// skynet_context 的 总数量
+	int init;						// 是否初始化
 	uint32_t monitor_exit;
 	pthread_key_t handle_key;
 };
@@ -66,11 +70,13 @@ skynet_context_total() {
 	return G_NODE.total;
 }
 
+// G_NODE.total 计数加 1
 static void
 context_inc() {
 	__sync_fetch_and_add(&G_NODE.total,1);
 }
 
+// G_NODE.total 计数减 1
 static void
 context_dec() {
 	__sync_fetch_and_sub(&G_NODE.total,1);
@@ -169,6 +175,7 @@ skynet_context_new(const char * name, const char *param) {
 int
 skynet_context_newsession(struct skynet_context *ctx) {
 	// session always be a positive number
+	// seesion 必须为正
 	int session = ++ctx->session_id;
 	if (session <= 0) {
 		ctx->session_id = 1;
@@ -179,17 +186,24 @@ skynet_context_newsession(struct skynet_context *ctx) {
 
 void 
 skynet_context_grab(struct skynet_context *ctx) {
+	// ctx 的引用 +1
 	__sync_add_and_fetch(&ctx->ref,1);
 }
 
 void
 skynet_context_reserve(struct skynet_context *ctx) {
 	skynet_context_grab(ctx);
-	// don't count the context reserved, because skynet abort (the worker threads terminate) only when the total context is 0 .
+	// don't count the context reserved, because skynet abort (the worker threads terminate) only when the total context is 0.
 	// the reserved context will be release at last.
+	
+	// 不要统计保留的 context, 因为 skynet 只有在 context 为 0 的时候终止(工作的线程被终止).
+	// 保留的 context 将在最后被释放.
+	// issue: 这里我的理解是, 认为传入的 ctx 是系统默认存在的, 不需要统计. 目前只有在 skynet_harbor_start 中调用过, 那么可以认为
+	// harbor 关联的这个 ctx 是当前节点默认存在的, 意思可以理解为, 我需要对 ctx 做引用计数, 但是这个 ctx 不要求进入 G_NODE 的统计.
 	context_dec();
 }
 
+// 删除 ctx 实例
 static void 
 delete_context(struct skynet_context *ctx) {
 	if (ctx->logfile) {
@@ -300,7 +314,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 			skynet_error(ctx, "May overload, message queue length = %d", overload);
 		}
 
-		skynet_monitor_trigger(sm, msg.source , handle);
+		skynet_monitor_trigger(sm, msg.source, handle);
 
 		if (ctx->cb == NULL) {
 			skynet_free(msg.data);
@@ -778,6 +792,8 @@ skynet_globalexit(void) {
 void
 skynet_initthread(int m) {
 	uintptr_t v = (uint32_t)(-m);
+
+	// 为指定线程特定数据键设置线程特定绑定
 	pthread_setspecific(G_NODE.handle_key, (void *)v);
 }
 

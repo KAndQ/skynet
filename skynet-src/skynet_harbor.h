@@ -30,10 +30,36 @@ struct remote_message {
 	size_t sz;                         // 数据长度
 };
 
+/**
+ * 发送数据
+ * @param rmsg remote_message
+ * @param source 发送源
+ * @param session 回话标识 
+ */
 void skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session);
+
+/**
+ * 判断 handle 是否是远程节点
+ * @param handle
+ * @return 远程节点返回 1, 否则返回 0
+ */
 int skynet_harbor_message_isremote(uint32_t handle);
+
+/**
+ * harbor 初始化
+ * @param harbor 可以是 1-255 间的任意整数。一个 skynet 网络最多支持 255 个节点。每个节点有必须有一个唯一的编号。
+ */
 void skynet_harbor_init(int harbor);
+
+/**
+ * 节点启动, 必须和 skynet_harbor_start 成对使用
+ * @param ctx skynet_context
+ */
 void skynet_harbor_start(void * ctx);
+
+/**
+ * 节点退出, 必须和 skynet_harbor_start 成对使用
+ */
 void skynet_harbor_exit();
 
 #endif
