@@ -33,10 +33,11 @@ skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t dest
 	__sync_fetch_and_add(&sm->version, 1);
 }
 
+// check 函数和上面的 trigger 函数不是运行在同一个线程的
 void 
 skynet_monitor_check(struct skynet_monitor *sm) {
 	if (sm->version == sm->check_version) {
-		if (sm->destination) {	// sm 消息派发完成之后, 
+		if (sm->destination) {		// skynet_context 在 dispatch_message 数据之后, 会设置 destination 参数为 0.
 			skynet_context_endless(sm->destination);
 			skynet_error(NULL, "A message from [ :%08x ] to [ :%08x ] maybe in an endless loop (version = %d)", sm->source , sm->destination, sm->version);
 		}

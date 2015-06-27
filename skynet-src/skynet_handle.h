@@ -1,3 +1,11 @@
+/**
+ * skynet_handle 处理着 handle, skynet_context, name 三者之间的关系.
+ * 简单来说可以从:
+ * 1. handle 得到 skynet_context;
+ * 2. skynet_context 得到 handle;
+ * 3. name 得到 handle;
+ */
+
 #ifndef SKYNET_CONTEXT_HANDLE_H
 #define SKYNET_CONTEXT_HANDLE_H
 

@@ -10,7 +10,7 @@
 static struct skynet_context * REMOTE = 0;
 
 // 当前节点的 harbor
-static unsigned int HARBOR = ~0;
+static unsigned int HARBOR = ~0;	// 0xffffffff
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
@@ -18,14 +18,14 @@ skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
 	// 获得当前发送消息的类型, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
 	int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
 
-	// 截取实际的放松数据大小
+	// 截取实际的发送数据大小
 	rmsg->sz &= HANDLE_MASK;
 
 	// type 校验
 	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR && REMOTE);
 
-	// 发送数据给 REMOTE
-	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg) , source, type , session);
+	// 使用 REMOTE 发送数据给目标节点
+	skynet_context_send(REMOTE, rmsg, sizeof(*rmsg), source, type, session);
 }
 
 int 
@@ -52,6 +52,7 @@ skynet_harbor_start(void *ctx) {
 	// It will be released at last by calling skynet_harbor_exit
 	// HARBOR 必须被保留引用, 确认指针是可用的
 	// 在调用 skynet_harbor_exit 之后将被删除掉
+	// 注意这里调用的是 skynet_context_reserve 说明这是整个 skynet 系统保留的, 不在 G_NODE 的统计里面
 	skynet_context_reserve(ctx);
 	REMOTE = ctx;
 }

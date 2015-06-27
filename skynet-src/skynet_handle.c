@@ -77,7 +77,9 @@ skynet_handle_register(struct skynet_context *ctx) {
 
 		// 将原来的内容进行复制
 		for (i=0;i<s->slot_size;i++) {
-			int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);	// 获得在当前分配的空间中可用的索引, 注意这里是使用  (slot_size * 2 - 1) 在进行为操作.
+
+			// 获得在当前分配的空间中可用的索引, 注意这里是使用  (slot_size * 2 - 1) 在进行为操作.
+			int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
 			assert(new_slot[hash] == NULL);
 
 			// 这里为什么不是直接 new_slot[i] = s->slot[i] 呢, 而要绕个弯拿到 hash, 然后 new_slot[hash] = s->slot[i]

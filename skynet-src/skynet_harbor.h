@@ -1,3 +1,8 @@
+/**
+ * skynet 的 harbor 的相关的逻辑.
+ * 在当前节点系统会 reserve 一个 skynet_context 专门给 harbor 使用.
+ */
+
 #ifndef SKYNET_HARBOR_H
 #define SKYNET_HARBOR_H
 
@@ -52,13 +57,13 @@ int skynet_harbor_message_isremote(uint32_t handle);
 void skynet_harbor_init(int harbor);
 
 /**
- * 节点启动, 必须和 skynet_harbor_start 成对使用
+ * 当前节点关联对应的 skynet_context
  * @param ctx skynet_context
  */
 void skynet_harbor_start(void * ctx);
 
 /**
- * 节点退出, 必须和 skynet_harbor_start 成对使用
+ * 当前节点取消关联的 skynet_context
  */
 void skynet_harbor_exit();
 

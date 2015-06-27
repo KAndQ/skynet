@@ -1,3 +1,7 @@
+/**
+ * skynet 内存使用的一个 hook.
+ */
+
 #ifndef SKYNET_MALLOC_HOOK_H
 #define SKYNET_MALLOC_HOOK_H
 

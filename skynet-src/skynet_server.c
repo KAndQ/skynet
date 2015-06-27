@@ -39,6 +39,7 @@
 
 #endif
 
+// skynet 的核心数据结构之一
 struct skynet_context {
 	void * instance;				// 创建的实例
 	struct skynet_module * mod;		// 关联的模块
@@ -791,6 +792,11 @@ skynet_globalexit(void) {
 
 void
 skynet_initthread(int m) {
+
+	// intptr_t/uintptr_t: 无符号与指针空间等宽度整型, 具体的了解看下面的 3 个链接
+	// http://www.cnblogs.com/Anker/p/3438480.html
+	// http://blog.csdn.net/menzi11/article/details/9322251
+	// http://blog.csdn.net/lsjseu/article/details/42360709
 	uintptr_t v = (uint32_t)(-m);
 
 	// 为指定线程特定数据键设置线程特定绑定

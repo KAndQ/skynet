@@ -1,3 +1,7 @@
+/**
+ * 守护线程的相关逻辑
+ */
+
 #ifndef skynet_daemon_h
 #define skynet_daemon_h
 

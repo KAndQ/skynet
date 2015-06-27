@@ -1,3 +1,9 @@
+/**
+ * 这里实现了 skynet 的核心逻辑.
+ * 每个 skynet_context 在互相的发送消息, 从而形成当前节点内的数据通信. 
+ * 和每个 skynet 网络节点进行数据传输其实也是依靠 skynet_context.
+ */
+
 #ifndef SKYNET_SERVER_H
 #define SKYNET_SERVER_H
 
@@ -28,7 +34,7 @@ void skynet_context_reserve(struct skynet_context *ctx);
 struct skynet_context * skynet_context_release(struct skynet_context *);
 
 /**
- * 获得 skynet_context 的 handle
+ * 获得 skynet_context 的 handle, 只读, 不允许直接操作 skynet_context 的 handle
  * @param skynet_handel
  * @return handle
  */
@@ -54,7 +60,7 @@ int skynet_context_push(uint32_t handle, struct skynet_message *message);
 void skynet_context_send(struct skynet_context * context, void * msg, size_t sz, uint32_t source, int type, int session);
 
 /**
- * 生成当前服务的请求的 session, 具体的可以看 skynet.h 的 skynet_send 函数, 有 session 的详细说明
+ * 生成当前 skynet_context 的新 session
  * @param skynet_context
  * @return session
  */
@@ -63,19 +69,19 @@ int skynet_context_newsession(struct skynet_context *);
 
 struct message_queue * skynet_context_message_dispatch(struct skynet_monitor *, struct message_queue *, int weight);	// return next queue
 
-// 当前节点中 context 的总量
+// 当前节点中 skynet_context 的总量
 int skynet_context_total();
 
 // 
 void skynet_context_dispatchall(struct skynet_context * context);	// for skynet_error output before exit
 
-// 标记当前的 context 发生了 endless 现象(信息无限循环发送)
+// 标记当前的 context 发生了 endless 现象(进入死循环逻辑)
 void skynet_context_endless(uint32_t handle);	// for monitor
 
-// 初始化, 只在 skynet_main 中使用.
+// 进程启动时初始化, 只在 skynet_main 中使用.
 void skynet_globalinit(void);
 
-// 资源释放, 只在 skynet_main 中使用.
+// 进程关闭时资源释放, 只在 skynet_main 中使用.
 void skynet_globalexit(void);
 
 // 
