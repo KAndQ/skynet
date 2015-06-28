@@ -48,11 +48,11 @@ struct skynet_context {
 	struct message_queue *queue;	// 对应的消息队列
 	FILE * logfile;					// 输出信息的 log 文件
 	char result[32];
-	uint32_t handle;				// skynet_handle 的 handle
-	int session_id;
+	uint32_t handle;				// skynet_handle 中的 handle
+	int session_id;					// session 的累计计数
 	int ref;						// 引用计数
 	bool init;						// 是否初始化
-	bool endless;					// 
+	bool endless;					// 标记当前 context 处理消息的时候是不是进入了死循环(也有可能计算消耗的时间过长)
 
 	CHECKCALLING_DECL
 };
@@ -61,6 +61,11 @@ struct skynet_node {
 	int total;						// skynet_context 的 总数量
 	int init;						// 是否初始化
 	uint32_t monitor_exit;
+
+	// 概念及作用
+	// 在单线程程序中，我们经常要用到"全局变量"以实现多个函数间共享数据。在多线程环境下，由于数据空间是共享的，因此全局变量也为所有线程所共有。
+	// 但有时应用程序设计中有必要提供线程私有的全局变量，仅在某个线程中有效，但却可以跨多个函数访问，比如程序可能需要每个线程维护一个链表，而使用相同的函数操作，
+	// 最简单的办法就是使用同名而不同变量地址的线程相关数据结构。这样的数据结构可以由Posix线程库维护，称为线程私有数据（Thread-specific Data，或TSD）。
 	pthread_key_t handle_key;
 };
 
@@ -86,14 +91,18 @@ context_dec() {
 uint32_t 
 skynet_current_handle(void) {
 	if (G_NODE.init) {
+		// 已经初始化过, 那么得到各个线程对应的值
 		void * handle = pthread_getspecific(G_NODE.handle_key);
 		return (uint32_t)(uintptr_t)handle;
 	} else {
+
+		// 没有初始化, 只认为有主线程有作用.
 		uint32_t v = (uint32_t)(-THREAD_MAIN);
 		return v;
 	}
 }
 
+// 将 id 以这样格式 ":FF123456" 的字符串返回.
 static void
 id_to_hex(char * str, uint32_t id) {
 	int i;
@@ -105,17 +114,21 @@ id_to_hex(char * str, uint32_t id) {
 	str[9] = '\0';
 }
 
+// issues!!!
 struct drop_t {
 	uint32_t handle;
 };
 
+// 丢弃掉 skynet_message 数据, 把 skynet_message 管理的 data 数据内容释放掉
 static void
 drop_message(struct skynet_message *msg, void *ud) {
 	struct drop_t *d = ud;
 	skynet_free(msg->data);
 	uint32_t source = d->handle;
 	assert(source);
+
 	// report error to the message source
+	// 报错错误给消息源
 	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
 
@@ -777,16 +790,27 @@ skynet_globalinit(void) {
 	G_NODE.total = 0;
 	G_NODE.monitor_exit = 0;
 	G_NODE.init = 1;
+
+	// 该函数从TSD池中分配一项，将其值赋给key供以后访问使用。
+	// 如果 destr_function 不为空，在线程退出（pthread_exit()）时将以key所关联的数据为参数调用 destr_function()，以释放分配的缓冲区。
+	// 不论哪个线程调用 pthread_key_create()，所创建的key都是所有线程可访问的，
+	// 但各个线程可根据自己的需要往key中填入不同的值，这就相当于提供了一个同名而不同值的全局变量。
 	if (pthread_key_create(&G_NODE.handle_key, NULL)) {
 		fprintf(stderr, "pthread_key_create failed");
 		exit(1);
 	}
+
 	// set mainthread's key
+	// 设置主线程的键
 	skynet_initthread(THREAD_MAIN);
 }
 
 void 
 skynet_globalexit(void) {
+
+	// 注销一个TSD采用如下API
+	// 这个函数并不检查当前是否有线程正使用该TSD，也不会调用清理函数（destr_function），而只是将TSD释放以供下一次调用 pthread_key_create()使用。
+	// 在LinuxThreads中，它还会将与之相关的线程数据项设为NULL.
 	pthread_key_delete(G_NODE.handle_key);
 }
 
@@ -800,6 +824,9 @@ skynet_initthread(int m) {
 	uintptr_t v = (uint32_t)(-m);
 
 	// 为指定线程特定数据键设置线程特定绑定
+	// 写入（pthread_setspecific()）时，将pointer的值（不是所指的内容）与key相关联.
+	// 各个线程使用相同的 handle_key 却对应着不同的值, 达到线程存储私有化.
+	// 注意: pthread_setspecific 存储的值是指针值, 但是现在将实际的数值当成指针地址.
 	pthread_setspecific(G_NODE.handle_key, (void *)v);
 }
 

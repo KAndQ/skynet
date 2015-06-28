@@ -108,7 +108,7 @@ typedef int (*skynet_cb)(struct skynet_context * context, void *ud, int type, in
  */
 void skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb);
 
-// 当前服务的 handle 值, 在 skynet_server.c 中会详细介绍这个函数.
+// 得到当前线程所存储的 handle 值, 在 skynet_server.c 中会详细介绍这个函数.
 uint32_t skynet_current_handle(void);
 
 #endif
