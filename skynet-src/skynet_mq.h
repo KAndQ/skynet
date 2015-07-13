@@ -4,11 +4,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+// skynet 内部传输数据
 struct skynet_message {
-	uint32_t source;
-	int session;
-	void * data;
-	size_t sz;
+	uint32_t source;       // 发送源
+	int session;           // session, 细节查看 skynet.h
+	void * data;           // 数据内容
+	size_t sz;             // 数据内容大小
 };
 
 struct message_queue;
@@ -16,9 +17,15 @@ struct message_queue;
 void skynet_globalmq_push(struct message_queue * queue);
 struct message_queue * skynet_globalmq_pop(void);
 
+/**
+ * 创建 message_queue
+ * @param handle 关联的 skynet_context 的 handle
+ * @return message_queue
+ */
 struct message_queue * skynet_mq_create(uint32_t handle);
 void skynet_mq_mark_release(struct message_queue *q);
 
+/// 释放 skynet_message 的接口声明
 typedef void (*message_drop)(struct skynet_message *, void *);
 
 void skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud);
