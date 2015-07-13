@@ -1,3 +1,8 @@
+/**
+ * monitor 的主要功能其实当消息被 dispatch 的时候, 定制了一个标记, 判断是否进入了死循环.
+ * 实现的逻辑其实是开了一个线程, 可以查看 skynet_start.c 的 thread_monitor, 这个就是 monitor 专用的线程.
+ */
+
 #ifndef SKYNET_MONITOR_H
 #define SKYNET_MONITOR_H
 

@@ -1,5 +1,5 @@
 /**
- * skynet 的 harbor 的相关的逻辑.
+ * skynet 的 harbor(节点) 的相关的逻辑.
  * 在当前节点系统会 reserve 一个 skynet_context 专门给 harbor 使用.
  */
 
@@ -30,7 +30,7 @@ struct remote_name {
 
 // 发送给远程节点的消息
 struct remote_message {
-	struct remote_name destination;    // 发送的目标节点
+	struct remote_name destination;    // 发送的目标节点信息
 	const void * message;              // 发送数据
 	size_t sz;                         // 数据长度
 };

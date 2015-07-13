@@ -44,7 +44,7 @@ struct skynet_context;
 
 /**
  * skynet 框架打印信息
- * @param context skynet_context
+ * @param context 发送消息的 skynet_context
  * @param msg 打印信息
  */
 void skynet_error(struct skynet_context * context, const char *msg, ...);

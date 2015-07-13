@@ -9,7 +9,7 @@
 // 关联的 skynet_context
 static struct skynet_context * REMOTE = 0;
 
-// 当前节点的 harbor
+// 当前节点的 harbor, 使用高 8 位存储当前的数据
 static unsigned int HARBOR = ~0;	// 0xffffffff
 
 void 

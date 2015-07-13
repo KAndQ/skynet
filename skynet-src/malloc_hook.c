@@ -191,6 +191,8 @@ mallctl_opt(const char* name, int* newval) {
 
 // hook : malloc, realloc, free, calloc
 
+// 关于这里可能在看的时候, 会有疑问, 那就是为什么这里定义了 malloc 但是却没有报告重定义的错误.
+// 具体的细节可以看: http://www.blogbus.com/bigwhite-logs/77791357.html
 /// malloc 的 skynet 版本
 void *
 skynet_malloc(size_t size) {

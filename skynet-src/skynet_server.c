@@ -47,7 +47,7 @@ struct skynet_context {
 	skynet_cb cb;					// 回调的参数
 	struct message_queue *queue;	// 对应的消息队列
 	FILE * logfile;					// 输出信息的 log 文件
-	char result[32];
+	char result[32];				// 将 cmd_xxx 运算的一些值存储在 result 里面
 	uint32_t handle;				// skynet_handle 中的 handle
 	int session_id;					// session 的累计计数
 	int ref;						// 引用计数
@@ -66,6 +66,9 @@ struct skynet_node {
 	// 在单线程程序中，我们经常要用到"全局变量"以实现多个函数间共享数据。在多线程环境下，由于数据空间是共享的，因此全局变量也为所有线程所共有。
 	// 但有时应用程序设计中有必要提供线程私有的全局变量，仅在某个线程中有效，但却可以跨多个函数访问，比如程序可能需要每个线程维护一个链表，而使用相同的函数操作，
 	// 最简单的办法就是使用同名而不同变量地址的线程相关数据结构。这样的数据结构可以由Posix线程库维护，称为线程私有数据（Thread-specific Data，或TSD）。
+
+	// 在 skynet_initthread 时使用的是对应线程号(skynet_imp.h 中定义) 来初始化 handle_key 的值.
+	// 在调用过 dispatch_message 方法后, handle_key 保存的是当前线程调用 dispatch_message 时传入的 skynet_context 的 handle 值
 	pthread_key_t handle_key;
 };
 
@@ -91,7 +94,9 @@ context_dec() {
 uint32_t 
 skynet_current_handle(void) {
 	if (G_NODE.init) {
-		// 已经初始化过, 那么得到各个线程对应的值
+		// 已经初始化过:
+		// 1. 那么得到各个线程对应的值
+		// 2. 在调用过 dispatch_message 方法后, handle_key 保存的是当前线程调用 dispatch_message 时传入的 skynet_context 的 handle 值
 		void * handle = pthread_getspecific(G_NODE.handle_key);
 		return (uint32_t)(uintptr_t)handle;
 	} else {
@@ -385,7 +390,7 @@ handle_exit(struct skynet_context * context, uint32_t handle) {
 		skynet_error(context, "KILL :%0x", handle);
 	}
 	if (G_NODE.monitor_exit) {
-		skynet_send(context,  handle, G_NODE.monitor_exit, PTYPE_CLIENT, 0, NULL, 0);
+		skynet_send(context, handle, G_NODE.monitor_exit, PTYPE_CLIENT, 0, NULL, 0);
 	}
 	skynet_handle_retire(handle);
 }
