@@ -109,7 +109,8 @@ thread_timer(void *p) {
 		wakeup(m,m->count-1);
 		
 		// usleep功能把进程挂起一段时间，单位是微秒（百万分之一秒）；
-		// 头文件：unistd.h 语法: voidusleep(int micro_seconds); 
+		// 头文件：unistd.h 
+		// 语法: void usleep(int micro_seconds);
 		// 返回值: 无
 		// 内容说明：本函数可暂时使程序停止执行。
 		// 停止 2.5 毫秒

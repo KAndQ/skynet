@@ -47,8 +47,16 @@ struct link_list {
 };
 
 struct timer {
-	struct link_list near[TIME_NEAR];	// near[256]
-	struct link_list t[4][TIME_LEVEL];	// t[4][64]
+	// near[256], 保证计时的间隔是在 [0, 255] 这个区间内的短时间 timer_node, 加入到这个计时器链表数组中.
+	struct link_list near[TIME_NEAR];
+
+	// t[4][64], 对于大时间间隔的计时器, 这里对差值间隔分了 4 个数量级, 低 8 位之后的每 6 位为一个数量级.
+	// 6 位表示的在当前所在的层级中的索引, 索引具体的计算方式, 参考函数 add_node.
+	// t[0]: 表示第一个数量级, (0x4000, 0x0100], 差值在 16128 这个范围内;
+	// t[1]: 表示第二个数量级, (0x100000, 0x4000], 差值在 1032192 这个范围内;
+	// t[2]: 表示第三个数量级, (0x4000000, 0x100000], 差值在 66060288 这个范围内;
+	// t[3]: 表示第四个数量级, (0x100000000, 0x4000000], 差值在 4227858432 这个范围内;
+	struct link_list t[4][TIME_LEVEL];
 	int lock;							// 线程安全锁
 	uint32_t time;
 	uint32_t current;
@@ -74,7 +82,7 @@ link_clear(struct link_list *list) {
 
 /// 将 node 添加到 list 的链表中
 static inline void
-link(struct link_list *list,struct timer_node *node) {
+link(struct link_list *list, struct timer_node *node) {
 	// 这里有个有意思的地方, 当加入第一个元素的时候, list->head.next 是第一个链表的元素
 	// 所以 head 本身其实不是链表首, 但是起到记录链表首的作用
 	list->tail->next = node;
@@ -82,56 +90,119 @@ link(struct link_list *list,struct timer_node *node) {
 	node->next = 0;
 }
 
+/**
+ * 将 timer_node 添加到 timer 中.
+ * 这里面的逻辑很有意思, timer 会根据 timer_node.expire 的值, 决定将该 timer_node 放入到对应的链表里.
+ * @param T timer
+ * @param node timer_node
+ */
 static void
 add_node(struct timer * T, struct timer_node * node) {
-	uint32_t time = node->expire;
+	uint32_t time = node->expire;		// 注意, 这里的 time 是根据 T->time 计算得到的, 在函数 timer_add 里面
 	uint32_t current_time = T->time;
 	
+	// time 和 current_time 的差值在 [0, 255] 范围内, 
+	// 将 node 加入到 near 链表数组的对应的链表里面, 对应链表的选择通过 (time & TIME_NEAR_MASK) 计算得到.
 	if ((time | TIME_NEAR_MASK) == (current_time | TIME_NEAR_MASK)) {
 		link(&T->near[time & TIME_NEAR_MASK], node);
 	} else {
-		int i;
+		// (0000 0000 0000 0000 0100 0000 0000 0000)
 		uint32_t mask = TIME_NEAR << TIME_LEVEL_SHIFT;
+
+		int i;
 		for (i = 0; i < 3; i++) {
+			// i = 0: mask - 1 => (0000 0000 0000 0000 0011 1111 1111 1111)
+			// i = 1: mask - 1 => (0000 0000 0000 1111 1111 1111 1111 1111)
+			// i = 2: mask - 1 => (0000 0011 1111 1111 1111 1111 1111 1111)
+			// 判断当前所在的层级, 这里的运算是判断当前所在层级的最大数据是否相等,
+			// 如果相等那么说明找到了所在的层级, 否则说明是更高的层级不相等, 继续判断.
 			if ((time | (mask - 1)) == (current_time | (mask - 1))) {
 				break;
 			}
+
 			mask <<= TIME_LEVEL_SHIFT;
+			// i = 0: mask => (0000 0000 0001 0000 0000 0000 0000 0000)
+			// i = 1: mask => (0000 0100 0000 0000 0000 0000 0000 0000)
+			// i = 2: mask => (0000 0000 0000 0000 0000 0000 0000 0000)
 		}
 
-		link(&T->t[i][((time >> (TIME_NEAR_SHIFT + i * TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)], node);	
+		// i 是决定层级, 各个层次的描述在上面有描述.
+		// ((time >> (TIME_NEAR_SHIFT + i * TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK), 这里计算得到的是对应链表的索引.
+		
+		// 这里会出现一种特殊的情况, 当 timer_node.expire < timer.time, 并且它们的差值大于 255, 并且 timer_node.expire < 0x4000000 的时候, 
+		// timer_node 会被分配到 timer.t[3][0] 这个链表中!!!
+		link(&T->t[i][((time >> (TIME_NEAR_SHIFT + i * TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)], node);
 	}
 }
 
+/**
+ * 给 T 添加一个计时器
+ * @param T timer
+ * @param arg 附加数据
+ * @param sz 附加数据大小
+ * @param time 计时时间
+ */
 static void
-timer_add(struct timer *T,void *arg,size_t sz,int time) {
-	struct timer_node *node = (struct timer_node *)skynet_malloc(sizeof(*node)+sz);
-	memcpy(node+1,arg,sz);
+timer_add(struct timer * T, void *arg, size_t sz, int time) {
 
+	// 分配 timer_node 的内存空间
+	// 注意! 这里多分配了 sz 的内存容量, 用来存储 arg 的数据
+	struct timer_node * node = (struct timer_node *)skynet_malloc(sizeof(*node) + sz);
+
+	// 在 node 内存容量之后, 存储 arg 的数据
+	memcpy(node + 1, arg, sz);
+
+	// 保证线程安全
 	LOCK(T);
 
-		node->expire = time + T->time;
-		add_node(T,node);
+	// 计算期满时间, 这个时候有可能 node->expire < T->time, 因为超过了 4294967295
+	node->expire = time + T->time;
+
+	// 将 node 添加到 timer 中, 当 expire 为 0 时的特殊处理已经在 add_node 中添加了说明
+	add_node(T, node);
 
 	UNLOCK(T);
 }
 
+/**
+ * 将 timer.t 中指定的链表清空, 并且链表内的数据重新在添加会 timer 中
+ * @param T timer
+ * @param level 层级
+ * @param idx 索引
+ */
 static void
-move_list(struct timer *T, int level, int idx) {
+move_list(struct timer * T, int level, int idx) {
+
+	// 获得 t[level][idx] 的链表, 并且清空 t[level][idx] 链表
 	struct timer_node *current = link_clear(&T->t[level][idx]);
+
+	// 将以 current 为链表头的链表元素重新再添加到 T 中
 	while (current) {
-		struct timer_node *temp=current->next;
-		add_node(T,current);
-		current=temp;
+		// 拿到下一个元素
+		struct timer_node * temp = current->next;
+
+		// 添加到 T 中
+		add_node(T, current);
+
+		// 继续下一次的计算
+		current = temp;
 	}
 }
 
 static void
 timer_shift(struct timer *T) {
 	int mask = TIME_NEAR;
+
+	// 时间流逝
 	uint32_t ct = ++T->time;
+
+	// ct == 0, 表示 T->time 已经累加超过 4294967295, 重新从 0 开始计数.
 	if (ct == 0) {
+
+		// 
 		move_list(T, 3, 0);
+
+	// 
 	} else {
 		uint32_t time = ct >> TIME_NEAR_SHIFT;
 		int i = 0;
