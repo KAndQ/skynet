@@ -1,3 +1,7 @@
+/**
+ * 实现 message_queue 的管理.
+ */
+
 #ifndef SKYNET_MESSAGE_QUEUE_H
 #define SKYNET_MESSAGE_QUEUE_H
 
@@ -14,7 +18,13 @@ struct skynet_message {
 
 struct message_queue;
 
+/**
+ * 将 message_queue 压入到 global_queue 队列中
+ * @param queue 准备压入的 message_queue
+ */
 void skynet_globalmq_push(struct message_queue * queue);
+
+/// 从 global_queue 队首弹出一个 message_queue
 struct message_queue * skynet_globalmq_pop(void);
 
 /**
@@ -23,22 +33,41 @@ struct message_queue * skynet_globalmq_pop(void);
  * @return message_queue
  */
 struct message_queue * skynet_mq_create(uint32_t handle);
+
+/// 将 q 标记为需要释放
 void skynet_mq_mark_release(struct message_queue *q);
 
 /// 释放 skynet_message 的接口声明
 typedef void (*message_drop)(struct skynet_message *, void *);
 
+/// 释放 q 的全部资源, 如果 q 之前已经标记了 release, 那么所有资源都将被释; 否则压入到 global_queue 中
 void skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud);
+
+/// 得到 message_queue 的 handle
 uint32_t skynet_mq_handle(struct message_queue *);
 
 // 0 for success
+/**
+ * 从 message_queue 队首弹出一个 skynet_message 消息
+ * 注意: 只有在弹出消息的时候才会做过载的计算
+ * @param q message_queue
+ * @param message 弹出的消息, 如果弹出成功, 给 message 赋值
+ * @return 成功返回 0, 否则返回 1
+ */
 int skynet_mq_pop(struct message_queue *q, struct skynet_message *message);
+
+/// 将 message 压入到 q 中
 void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
 
 // return the length of message queue, for debug
+// 得到 message_queue 的长度, 用于测试
 int skynet_mq_length(struct message_queue *q);
+
+// 得到当前 message_queue 的超载量.
+// 注意, 如果当超载量不为 0 的时候, 调用这个函数会将超载量设置为 0.
 int skynet_mq_overload(struct message_queue *q);
 
+/// 当前节点的消息队列初始化
 void skynet_mq_init();
 
 #endif
