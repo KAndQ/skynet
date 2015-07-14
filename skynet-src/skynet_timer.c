@@ -12,20 +12,23 @@
 #include <stdint.h>
 
 #if defined(__APPLE__)
+// Linux系统的日期时间头文件，sys/time.h 通常会包含 include <time.h>
 #include <sys/time.h>
 #endif
 
+// 目前没有使用到
 typedef void (*timer_execute_func)(void *ud,void *arg);
 
+// 保证线程安全的一些相关操作
 #define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
 #define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 #define TIME_NEAR_SHIFT 8
-#define TIME_NEAR (1 << TIME_NEAR_SHIFT)
+#define TIME_NEAR (1 << TIME_NEAR_SHIFT)	// 256
 #define TIME_LEVEL_SHIFT 6
-#define TIME_LEVEL (1 << TIME_LEVEL_SHIFT)
-#define TIME_NEAR_MASK (TIME_NEAR-1)
-#define TIME_LEVEL_MASK (TIME_LEVEL-1)
+#define TIME_LEVEL (1 << TIME_LEVEL_SHIFT)	// 64
+#define TIME_NEAR_MASK (TIME_NEAR-1)		// 0xFF(11111111)
+#define TIME_LEVEL_MASK (TIME_LEVEL-1)		// 0x3F(00111111)
 
 struct timer_event {
 	uint32_t handle;
@@ -33,19 +36,20 @@ struct timer_event {
 };
 
 struct timer_node {
-	struct timer_node *next;
-	uint32_t expire;
+	struct timer_node *next;	// 链表的下一个 timer_node
+	uint32_t expire;			// 计时器的时限
 };
 
+// timer_node 的链表
 struct link_list {
-	struct timer_node head;
-	struct timer_node *tail;
+	struct timer_node head;		// 其实链表头元素(timer_node)是从 head.next 开始
+	struct timer_node *tail;	// 链表尾的指针
 };
 
 struct timer {
-	struct link_list near[TIME_NEAR];
-	struct link_list t[4][TIME_LEVEL];
-	int lock;
+	struct link_list near[TIME_NEAR];	// near[256]
+	struct link_list t[4][TIME_LEVEL];	// t[4][64]
+	int lock;							// 线程安全锁
 	uint32_t time;
 	uint32_t current;
 	uint32_t starttime;
@@ -55,40 +59,47 @@ struct timer {
 
 static struct timer * TI = NULL;
 
+/// 清空 list 链表, 并返回链表头
 static inline struct timer_node *
 link_clear(struct link_list *list) {
+	// 获得链表头
 	struct timer_node * ret = list->head.next;
+
+	// 重置为空链表
 	list->head.next = 0;
 	list->tail = &(list->head);
 
 	return ret;
 }
 
+/// 将 node 添加到 list 的链表中
 static inline void
 link(struct link_list *list,struct timer_node *node) {
+	// 这里有个有意思的地方, 当加入第一个元素的时候, list->head.next 是第一个链表的元素
+	// 所以 head 本身其实不是链表首, 但是起到记录链表首的作用
 	list->tail->next = node;
 	list->tail = node;
-	node->next=0;
+	node->next = 0;
 }
 
 static void
-add_node(struct timer *T,struct timer_node *node) {
-	uint32_t time=node->expire;
-	uint32_t current_time=T->time;
+add_node(struct timer * T, struct timer_node * node) {
+	uint32_t time = node->expire;
+	uint32_t current_time = T->time;
 	
-	if ((time|TIME_NEAR_MASK)==(current_time|TIME_NEAR_MASK)) {
-		link(&T->near[time&TIME_NEAR_MASK],node);
+	if ((time | TIME_NEAR_MASK) == (current_time | TIME_NEAR_MASK)) {
+		link(&T->near[time & TIME_NEAR_MASK], node);
 	} else {
 		int i;
-		uint32_t mask=TIME_NEAR << TIME_LEVEL_SHIFT;
-		for (i=0;i<3;i++) {
-			if ((time|(mask-1))==(current_time|(mask-1))) {
+		uint32_t mask = TIME_NEAR << TIME_LEVEL_SHIFT;
+		for (i = 0; i < 3; i++) {
+			if ((time | (mask - 1)) == (current_time | (mask - 1))) {
 				break;
 			}
 			mask <<= TIME_LEVEL_SHIFT;
 		}
 
-		link(&T->t[i][((time>>(TIME_NEAR_SHIFT + i*TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)],node);	
+		link(&T->t[i][((time >> (TIME_NEAR_SHIFT + i * TIME_LEVEL_SHIFT)) & TIME_LEVEL_MASK)], node);	
 	}
 }
 
@@ -99,7 +110,7 @@ timer_add(struct timer *T,void *arg,size_t sz,int time) {
 
 	LOCK(T);
 
-		node->expire=time+T->time;
+		node->expire = time + T->time;
 		add_node(T,node);
 
 	UNLOCK(T);
@@ -123,13 +134,13 @@ timer_shift(struct timer *T) {
 		move_list(T, 3, 0);
 	} else {
 		uint32_t time = ct >> TIME_NEAR_SHIFT;
-		int i=0;
+		int i = 0;
 
-		while ((ct & (mask-1))==0) {
-			int idx=time & TIME_LEVEL_MASK;
-			if (idx!=0) {
+		while ((ct & (mask - 1)) == 0) {
+			int idx = time & TIME_LEVEL_MASK;
+			if (idx != 0) {
 				move_list(T, i, idx);
-				break;				
+				break;
 			}
 			mask <<= TIME_LEVEL_SHIFT;
 			time >>= TIME_LEVEL_SHIFT;
