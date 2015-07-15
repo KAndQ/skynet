@@ -1,3 +1,8 @@
+/**
+ * skynet 节点中使用的计时器, 简单来说就是 skynet_context 可以使用 skynet_timeout 注册计时器.
+ * 到达时间的计时器会让发送消息到注册的 skynet_context, 告诉计时器到达时间.
+ */
+
 #ifndef SKYNET_TIMER_H
 #define SKYNET_TIMER_H
 
