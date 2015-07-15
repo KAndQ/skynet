@@ -252,6 +252,7 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	LOCK(q)
 
 	// 将 message 压入队尾
+	// 注意, 这里是赋值!!!
 	q->queue[q->tail] = *message;
 
 	// 保证索引在可用的区间内

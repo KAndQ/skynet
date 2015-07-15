@@ -32,7 +32,7 @@ struct remote_name {
 struct remote_message {
 	struct remote_name destination;    // 发送的目标节点信息
 	const void * message;              // 发送数据
-	size_t sz;                         // 数据长度
+	size_t sz;                         // 数据长度, 高 8 位存储的是数据类型
 };
 
 /**

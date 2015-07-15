@@ -13,7 +13,7 @@ struct skynet_message {
 	uint32_t source;       // 发送源
 	int session;           // session, 细节查看 skynet.h
 	void * data;           // 数据内容
-	size_t sz;             // 数据内容大小
+	size_t sz;             // 数据内容大小, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
 };
 
 struct message_queue;
