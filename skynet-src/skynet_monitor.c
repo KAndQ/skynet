@@ -16,6 +16,7 @@ struct skynet_monitor {
 
 struct skynet_monitor * 
 skynet_monitor_new() {
+	// 分配内存资源, 并初始化
 	struct skynet_monitor * ret = skynet_malloc(sizeof(*ret));
 	memset(ret, 0, sizeof(*ret));
 	return ret;
@@ -23,11 +24,13 @@ skynet_monitor_new() {
 
 void 
 skynet_monitor_delete(struct skynet_monitor *sm) {
+	// 释放内存资源
 	skynet_free(sm);
 }
 
 void 
 skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t destination) {
+	// 在发送消息前, 记录一次状态
 	sm->source = source;
 	sm->destination = destination;
 	__sync_fetch_and_add(&sm->version, 1);
@@ -39,7 +42,7 @@ skynet_monitor_check(struct skynet_monitor *sm) {
 	if (sm->version == sm->check_version) {
 		if (sm->destination) {		// skynet_context 在 dispatch_message 数据之后, 会设置 destination 参数为 0.
 			skynet_context_endless(sm->destination);
-			skynet_error(NULL, "A message from [ :%08x ] to [ :%08x ] maybe in an endless loop (version = %d)", sm->source , sm->destination, sm->version);
+			skynet_error(NULL, "A message from [ :%08x ] to [ :%08x ] maybe in an endless loop (version = %d)", sm->source, sm->destination, sm->version);
 		}
 	} else {
 		sm->check_version = sm->version;

@@ -17,7 +17,7 @@
 
 // reserve high 8 bits for remote id
 // 保留高 8 位作为远程节点的 id
-#define HANDLE_MASK 0xffffff        // 用于计算 handle 的值
+#define HANDLE_MASK 0x00ffffff        // 用于计算 handle 的值
 
 // 计算 handle 时的位偏移量
 #define HANDLE_REMOTE_SHIFT 24
@@ -36,7 +36,7 @@ struct remote_message {
 };
 
 /**
- * 发送数据
+ * 发送数据给其他 skynet 节点
  * @param rmsg remote_message
  * @param source 发送源
  * @param session 回话标识 
@@ -52,7 +52,7 @@ int skynet_harbor_message_isremote(uint32_t handle);
 
 /**
  * harbor 初始化
- * @param harbor 可以是 1-255 间的任意整数。一个 skynet 网络最多支持 255 个节点。每个节点有必须有一个唯一的编号。
+ * @param harbor 可以是 [1, 255] 间的任意整数。一个 skynet 网络最多支持 255 个节点。每个节点有必须有一个唯一的编号。
  */
 void skynet_harbor_init(int harbor);
 

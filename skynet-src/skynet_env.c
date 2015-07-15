@@ -26,6 +26,8 @@ static struct skynet_env *E = NULL;
 
 const char * 
 skynet_getenv(const char *key) {
+
+	// 保证线程的安全
 	LOCK(E)
 
 	lua_State *L = E->L;

@@ -92,7 +92,7 @@ thread_monitor(void *p) {
 		}
 		for (i=0;i<5;i++) {
 			CHECK_ABORT
-			sleep(1);
+			sleep(1);	// 1ms
 		}
 	}
 

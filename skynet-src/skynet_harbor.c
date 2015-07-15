@@ -6,10 +6,10 @@
 #include <stdio.h>
 #include <assert.h>
 
-// 关联的 skynet_context
+// 关联的并且跟远程节点通信的 skynet_context
 static struct skynet_context * REMOTE = 0;
 
-// 当前节点的 harbor, 使用高 8 位存储当前的数据
+// 当前节点的 harbor, 使用高 8 位存储当前的 harbor 数据
 static unsigned int HARBOR = ~0;	// 0xffffffff
 
 void 
@@ -33,7 +33,7 @@ skynet_harbor_message_isremote(uint32_t handle) {
 	// 保证初始化过
 	assert(HARBOR != ~0);
 
-	// 获得 handle 的 harbor
+	// 获得 handle 的 harbor, 只取高 8 位的数据
 	int h = (handle & ~HANDLE_MASK);
 
 	// handle 的 harbor 与本节点的 harbor 做比较

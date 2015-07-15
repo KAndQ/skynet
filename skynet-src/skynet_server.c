@@ -41,14 +41,14 @@
 
 // skynet 的核心数据结构之一
 struct skynet_context {
-	void * instance;				// 创建的实例
+	void * instance;				// skynet_module 对应的动态链接库创建的实例
 	struct skynet_module * mod;		// 关联的模块
 	void * cb_ud;					// 回调的参数
-	skynet_cb cb;					// 回调的参数
-	struct message_queue *queue;	// 对应的消息队列
+	skynet_cb cb;					// 回调的函数
+	struct message_queue *queue;	// 消息队列
 	FILE * logfile;					// 输出信息的 log 文件
 	char result[32];				// 将 cmd_xxx 运算的一些值存储在 result 里面
-	uint32_t handle;				// skynet_handle 中的 handle
+	uint32_t handle;				// 在当前 skynet 节点中的 handle, 由 skynet_handle 分配
 	int session_id;					// session 的累计计数
 	int ref;						// 引用计数
 	bool init;						// 是否初始化
@@ -57,6 +57,7 @@ struct skynet_context {
 	CHECKCALLING_DECL
 };
 
+// skynet 网络节点
 struct skynet_node {
 	int total;						// skynet_context 的 总数量
 	int init;						// 是否初始化
@@ -82,13 +83,13 @@ skynet_context_total() {
 // G_NODE.total 计数加 1
 static void
 context_inc() {
-	__sync_fetch_and_add(&G_NODE.total,1);
+	__sync_fetch_and_add(&G_NODE.total, 1);
 }
 
 // G_NODE.total 计数减 1
 static void
 context_dec() {
-	__sync_fetch_and_sub(&G_NODE.total,1);
+	__sync_fetch_and_sub(&G_NODE.total, 1);
 }
 
 uint32_t 
@@ -107,7 +108,7 @@ skynet_current_handle(void) {
 	}
 }
 
-// 将 id 以这样格式 ":FF123456" 的字符串返回.
+// 将 id 以这样格式 ":FF123456" 的字符串返回. 冒号之后的是 16 进制数据.
 static void
 id_to_hex(char * str, uint32_t id) {
 	int i;

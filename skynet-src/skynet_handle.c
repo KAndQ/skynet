@@ -36,7 +36,7 @@ uint32_t
 skynet_handle_register(struct skynet_context *ctx) {
 	struct handle_storage *s = H;
 
-	// 线程上锁
+	// 线程上锁, 保证线程安全
 	rwlock_wlock(&s->lock);
 	
 	for (;;) {	// 注意, 这里是一个无限循环, 必须拿到一个可用的 handle
@@ -76,7 +76,7 @@ skynet_handle_register(struct skynet_context *ctx) {
 		memset(new_slot, 0, s->slot_size * 2 * sizeof(struct skynet_context *));
 
 		// 将原来的内容进行复制
-		for (i=0;i<s->slot_size;i++) {
+		for (i = 0; i < s->slot_size; i++) {
 
 			// 获得在当前分配的空间中可用的索引, 注意这里是使用  (slot_size * 2 - 1) 在进行为操作.
 			int hash = skynet_context_handle(s->slot[i]) & (s->slot_size * 2 - 1);
@@ -123,13 +123,15 @@ skynet_handle_retire(uint32_t handle) {
 	&& skynet_context_handle(ctx) == handle) {
 		s->slot[hash] = NULL;
 		ret = 1;
+
+		// 将关联注册的名字资源也一同释放掉
 		int i;
-		int j=0, n=s->name_count;
-		for (i=0; i<n; ++i) {
+		int j = 0, n = s->name_count;
+		for (i = 0; i < n; ++i) {
 			if (s->name[i].handle == handle) {	// 判断是否有注册名字
 				skynet_free(s->name[i].name);	// 释放内存
 				continue;						// 一个 handle 允许注册多个名字, 继续判断
-			} else if (i!=j) {
+			} else if (i != j) {
 				// 向数组的头部移动
 				s->name[j] = s->name[i];
 			}
@@ -156,16 +158,23 @@ skynet_handle_retire(uint32_t handle) {
 void 
 skynet_handle_retireall() {
 	struct handle_storage *s = H;
-	for (;;) {
-		int n=0;
+	for (;;) {	// 保证所有的资源都被回收
+
+		int n = 0;
 		int i;
-		for (i=0;i<s->slot_size;i++) {
+		for (i = 0; i < s->slot_size; i++) {
+			// 保证线程安全
 			rwlock_rlock(&s->lock);
+
+			// 拿到 context 的 handle
 			struct skynet_context * ctx = s->slot[i];
 			uint32_t handle = 0;
 			if (ctx)
 				handle = skynet_context_handle(ctx);
+
 			rwlock_runlock(&s->lock);
+
+			// 对 handle 做回收处理
 			if (handle != 0) {		// 这就是上面说的, handle 不会使用 0.
 				if (skynet_handle_retire(handle)) {
 					++n;

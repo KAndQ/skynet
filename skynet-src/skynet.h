@@ -98,7 +98,7 @@ int skynet_sendname(struct skynet_context * context, uint32_t source, const char
 int skynet_isremote(struct skynet_context *, uint32_t handle, int * harbor);
 
 // 会在 skynet_server.c 的 dispatch_message 中详细说明这个函数类型的功能.
-typedef int (*skynet_cb)(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz);
+typedef int (*skynet_cb)(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz);
 
 /**
  * 将 ud 和 cb 传递给 context

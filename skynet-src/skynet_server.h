@@ -35,7 +35,7 @@ struct skynet_context * skynet_context_release(struct skynet_context *);
 
 /**
  * 获得 skynet_context 的 handle, 只读, 不允许直接操作 skynet_context 的 handle
- * @param skynet_handel
+ * @param skynet_context
  * @return handle
  */
 uint32_t skynet_context_handle(struct skynet_context *);
