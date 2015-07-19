@@ -136,7 +136,7 @@ _open_sym(struct skynet_module *mod) {
 	// symbol：要求获取的函数或全局变量的名称。
 	// void* 指向函数的地址，供调用使用。
 
-	// 获得 xxxx_create 函数
+	// 获得 xxxx_create 函数, 模块函数在定义的时候也必须按照这种格式来命名
 	strcpy(tmp+name_size, "_create");
 	mod->create = dlsym(mod->module, tmp);
 

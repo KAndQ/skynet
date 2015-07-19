@@ -83,21 +83,30 @@ uint32_t skynet_queryname(struct skynet_context * context, const char * name);
  */
 int skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * msg, size_t sz);
 
-/**
- * 同上面的函数, 只是 destination 换成了使用服务的名字.
- */
+/// 同上面的函数, 只是 destination 换成了使用服务注册的名字.
 int skynet_sendname(struct skynet_context * context, uint32_t source, const char * destination , int type, int session, void * msg, size_t sz);
 
 /**
- * 判断 handle 对应的服务是否是远程节点
- * @param context skynet_context
- * @param handle 待判断的服务 handle
- * @param harbor 得到 handle 对应的 harbor
- * @return 1 表示是远程节点, 否则反之.
+ * 判断 handle 是否是远程节点
+ * @param context skynet_context 暂未使用
+ * @param handle 待判断的 handle
+ * @param harbor 如果传入的值非 NULL, 那么将得到 handle 对应的远程节点 harbor id
+ * @return 1 表示 handle 是远程节点的 handle, 否则为 0
  */
 int skynet_isremote(struct skynet_context *, uint32_t handle, int * harbor);
 
-// 会在 skynet_server.c 的 dispatch_message 中详细说明这个函数类型的功能.
+/**
+ * 每个 skynet_context 在 dispatch_message 中处理 skynet_message 的回调接口定义. 
+ * 更详细的注释请查看 skynet_serve.c 的 dispatch_message 函数.
+ * @param context skynet_context 调用的服务实例
+ * @param ud 用户自定义的类型参数
+ * @param type 消息类型
+ * @param session 回话 ID
+ * @param source 发送源
+ * @param msg 信息数据
+ * @param sz 数据大小
+ * @return 如果调用成功返回 0, 否则返回非 0
+ */
 typedef int (*skynet_cb)(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz);
 
 /**

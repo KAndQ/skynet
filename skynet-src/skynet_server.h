@@ -16,7 +16,7 @@ struct skynet_monitor;
 
 /**
  * 创建 skynet_context
- * @param name module name
+ * @param name 模块的名称
  * @param parm 初始化参数
  * @return 创建成功返回 skynet_context, 否则返回 NULL
  */
@@ -30,7 +30,11 @@ void skynet_context_grab(struct skynet_context *);
 // 保留的 context 将在最后被释放.
 void skynet_context_reserve(struct skynet_context *ctx);
 
-// skynet_context 引用计数 -1
+/**
+ * skynet_context 引用计数 -1, 如果当引用计数为 0, skynet_context 的内存资源将被释放
+ * @param skynet_context 被 release 的 ctx
+ * @return 如果 skynet_context 资源没有被释放则返回传入的 skynet_context, 否则返回 NULL
+ */
 struct skynet_context * skynet_context_release(struct skynet_context *);
 
 /**
@@ -61,22 +65,32 @@ void skynet_context_send(struct skynet_context * context, void * msg, size_t sz,
 
 /**
  * 生成当前 skynet_context 的新 session
- * @param skynet_context
- * @return session
+ * @param skynet_context 计算 session 使用的 context
+ * @return session, 永远不会为 0, 也不会为负数.
  */
 int skynet_context_newsession(struct skynet_context *);
 
-
+/**
+ * dispatch message_queue 里面的消息
+ * @param skynet_monitor 
+ * @param message_queue 当前 dispatch 的 queue
+ * @param weight 权重, 决定 message_queue dispatch skynet_message 的次数
+ * @return 下次 dispatch 的队列
+ */
 struct message_queue * skynet_context_message_dispatch(struct skynet_monitor *, struct message_queue *, int weight);	// return next queue
 
 // 当前节点中 skynet_context 的总量
 int skynet_context_total();
 
-// 
-void skynet_context_dispatchall(struct skynet_context * context);	// for skynet_error output before exit
+// for skynet_error output before exit
+// 适用于在退出之前 skynet_error 的输出
+// 将 skynet_context 的队列数据全部弹出, 并且将对应的消息作为参数进行回调
+void skynet_context_dispatchall(struct skynet_context * context);
 
+// for monitor
+// 作用于监视器
 // 标记当前的 context 发生了 endless 现象(进入死循环逻辑)
-void skynet_context_endless(uint32_t handle);	// for monitor
+void skynet_context_endless(uint32_t handle);
 
 // 进程启动时初始化, 只在 skynet_main 中使用.
 void skynet_globalinit(void);

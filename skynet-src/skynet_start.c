@@ -183,10 +183,11 @@ start(int thread) {
 	create_thread(&pid[2], thread_socket, m);
 
 	static int weight[] = { 
-		-1, -1, -1, -1, 0, 0, 0, 0,
-		1, 1, 1, 1, 1, 1, 1, 1, 
-		2, 2, 2, 2, 2, 2, 2, 2, 
-		3, 3, 3, 3, 3, 3, 3, 3, };
+		-1, -1, -1, -1, 			// 0 次
+		0, 0, 0, 0,					// 不变
+		1, 1, 1, 1, 1, 1, 1, 1, 	// 除 2
+		2, 2, 2, 2, 2, 2, 2, 2, 	// 除 4
+		3, 3, 3, 3, 3, 3, 3, 3, };	// 除 8
 	struct worker_parm wp[thread];
 	for (i=0;i<thread;i++) {
 		wp[i].m = m;

@@ -114,7 +114,7 @@ skynet_mq_create(uint32_t handle) {
 	// set in_global flag to avoid push it to global queue .
 	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
 	// 当创建一个队列时(总是在服务的 create 和 init 之间), 设置 in_global 标记避免压入到全局队列.
-	// 如果服务初始化成功, skynet_context_new 方法将调用 skynet_sq_push 方法, 将它压入到全局队列.
+	// 如果服务初始化成功, skynet_context_new 方法将调用 skynet_globalmq_push 方法, 将它压入到全局队列.
 	q->in_global = MQ_IN_GLOBAL;
 	q->release = 0;
 	q->overload = 0;

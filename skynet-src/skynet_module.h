@@ -10,7 +10,7 @@ struct skynet_context;
 /// 创建 C 服务模块实例函数接口声明
 typedef void * (*skynet_dl_create)(void);
 
-/// C 服务模块初始化函数接口声明
+/// C 服务模块初始化函数接口声明, 返回 0 表示初始化成功, 否则表示失败
 typedef int (*skynet_dl_init)(void * inst, struct skynet_context *, const char * parm);
 
 /// C 服务模块资源释放函数接口声明

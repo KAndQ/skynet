@@ -59,7 +59,7 @@ skynet_handle_register(struct skynet_context *ctx) {
 				// 已经存储了 ctx 了, 可以解锁让其他线程使用了
 				rwlock_wunlock(&s->lock);
 
-				// 新的 handle 需要使用最左边的第 4 个字节记录当前 handle 所属的 harbor
+				// 新的 handle 需要使用高 8 位记录当前 handle 所属的 harbor
 				handle |= s->harbor;
 				return handle;
 			}
@@ -113,7 +113,7 @@ skynet_handle_retire(uint32_t handle) {
 	rwlock_wlock(&s->lock);
 
 	// 获得索引
-	uint32_t hash = handle & (s->slot_size-1);
+	uint32_t hash = handle & (s->slot_size - 1);
 	struct skynet_context * ctx = s->slot[hash];
 
 	if (ctx != NULL 
@@ -193,9 +193,10 @@ skynet_handle_grab(uint32_t handle) {
 	struct handle_storage *s = H;
 	struct skynet_context * result = NULL;
 
+	// 保证线程安全
 	rwlock_rlock(&s->lock);
-
-	uint32_t hash = handle & (s->slot_size-1);
+	
+	uint32_t hash = handle & (s->slot_size - 1);
 	struct skynet_context * ctx = s->slot[hash];
 	if (ctx 
 	// 1. 判断是否在同一个节点

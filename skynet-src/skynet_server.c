@@ -46,7 +46,7 @@ struct skynet_context {
 	void * cb_ud;					// 回调的参数
 	skynet_cb cb;					// 回调的函数
 	struct message_queue *queue;	// 消息队列
-	FILE * logfile;					// 输出信息的 log 文件
+	FILE * logfile;					// 日志文件句柄
 	char result[32];				// 将 cmd_xxx 运算的一些值存储在 result 里面
 	uint32_t handle;				// 在当前 skynet 节点中的 handle, 由 skynet_handle 分配
 	int session_id;					// session 的累计计数
@@ -102,7 +102,7 @@ skynet_current_handle(void) {
 		return (uint32_t)(uintptr_t)handle;
 	} else {
 
-		// 没有初始化, 只认为有主线程有作用.
+		// 没有初始化, 则返回 0xffffffff
 		uint32_t v = (uint32_t)(-THREAD_MAIN);
 		return v;
 	}
@@ -125,7 +125,7 @@ struct drop_t {
 	uint32_t handle;
 };
 
-// 丢弃掉 skynet_message 数据, 把 skynet_message 管理的 data 数据内容释放掉
+// 把 skynet_message 管理的 data 数据内容释放掉
 static void
 drop_message(struct skynet_message *msg, void *ud) {
 	struct drop_t *d = ud;
@@ -134,20 +134,21 @@ drop_message(struct skynet_message *msg, void *ud) {
 	assert(source);
 
 	// report error to the message source
-	// 报错错误给消息源
+	// 报告错误给 msg->source, 
 	skynet_send(NULL, source, msg->source, PTYPE_ERROR, 0, NULL, 0);
 }
 
 struct skynet_context * 
-skynet_context_new(const char * name, const char *param) {
+skynet_context_new(const char * name, const char * param) {
 	struct skynet_module * mod = skynet_module_query(name);
 
 	if (mod == NULL)
 		return NULL;
 
-	void *inst = skynet_module_instance_create(mod);
+	void * inst = skynet_module_instance_create(mod);
 	if (inst == NULL)
 		return NULL;
+
 	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
 	CHECKCALLING_INIT(ctx)
 
@@ -161,33 +162,55 @@ skynet_context_new(const char * name, const char *param) {
 
 	ctx->init = false;
 	ctx->endless = false;
+	
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
-	ctx->handle = 0;	
+	// 首先应该设置 handle 为 0, 避免 skynet_handle_retireall 方法得到一个未初始化的 handle
+	ctx->handle = 0;
 	ctx->handle = skynet_handle_register(ctx);
+
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
-	// init function maybe use ctx->handle, so it must init at last
+
+	// 全局引用计数 +1
 	context_inc();
 
+	// init function maybe use ctx->handle, so it must init at last
+	// init 函数可能会使用 ctx->handle, 所以它必须在最后初始化
 	CHECKCALLING_BEGIN(ctx)
 	int r = skynet_module_instance_init(mod, inst, ctx, param);
 	CHECKCALLING_END(ctx)
+
+	// inst 初始化成功
 	if (r == 0) {
 		struct skynet_context * ret = skynet_context_release(ctx);
+
+		// 标记初始化成功
 		if (ret) {
 			ctx->init = true;
 		}
+
+		// 将 queue 加入到 global_queue 的链表里面
 		skynet_globalmq_push(queue);
+
 		if (ret) {
 			skynet_error(ret, "LAUNCH %s %s", name, param ? param : "");
 		}
 		return ret;
+
+	// inst 初始化失败
 	} else {
 		skynet_error(ctx, "FAILED launch %s", name);
 		uint32_t handle = ctx->handle;
+
+		// ctx 引用 -1
 		skynet_context_release(ctx);
+
+		// ctx 引用 -1, 内存资源被释放, 这里会调用 delete_context 方法, 函数里面实现了 skynet_mq_mark_release
 		skynet_handle_retire(handle);
+
+		// 将消息队列里面的资源全部释放
 		struct drop_t d = { handle };
 		skynet_mq_release(queue, drop_message, &d);
+
 		return NULL;
 	}
 }
@@ -216,7 +239,7 @@ skynet_context_reserve(struct skynet_context *ctx) {
 	// don't count the context reserved, because skynet abort (the worker threads terminate) only when the total context is 0.
 	// the reserved context will be release at last.
 	
-	// 不要统计保留的 context, 因为 skynet 只有在 context 为 0 的时候终止(工作的线程被终止).
+	// 不要统计保留的 context, 因为 skynet 只有在 G_NODE 管理的 skynet_context 为 0 的时候终止(工作的线程被终止).
 	// 保留的 context 将在最后被释放.
 	// issue: 这里我的理解是, 认为传入的 ctx 是系统默认存在的, 不需要统计. 目前只有在 skynet_harbor_start 中调用过, 那么可以认为
 	// harbor 关联的这个 ctx 是当前节点默认存在的, 意思可以理解为, 我需要对 ctx 做引用计数, 但是这个 ctx 不要求进入 G_NODE 的统计.
@@ -226,18 +249,29 @@ skynet_context_reserve(struct skynet_context *ctx) {
 // 删除 ctx 实例
 static void 
 delete_context(struct skynet_context *ctx) {
+	// 关闭关联的日志文件
 	if (ctx->logfile) {
 		fclose(ctx->logfile);
 	}
+
+	// 关联的模块实例资源释放
 	skynet_module_instance_release(ctx->mod, ctx->instance);
+
+	// 标记关联的 queue 为释放状态
 	skynet_mq_mark_release(ctx->queue);
+
+	// 释放内存资源
 	skynet_free(ctx);
+
+	// 全局引用计数 -1
 	context_dec();
 }
 
 struct skynet_context * 
 skynet_context_release(struct skynet_context *ctx) {
-	if (__sync_sub_and_fetch(&ctx->ref,1) == 0) {
+
+	// 引用计数为 0 的时候, 自动释放掉 ctx
+	if (__sync_sub_and_fetch(&ctx->ref, 1) == 0) {
 		delete_context(ctx);
 		return NULL;
 	}
@@ -246,11 +280,16 @@ skynet_context_release(struct skynet_context *ctx) {
 
 int
 skynet_context_push(uint32_t handle, struct skynet_message *message) {
+	// 先保留一个引用
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
 		return -1;
 	}
+
+	// 将 message 压入到 context->queue 中
 	skynet_mq_push(ctx->queue, message);
+
+	// 释放保留
 	skynet_context_release(ctx);
 
 	return 0;
@@ -258,34 +297,60 @@ skynet_context_push(uint32_t handle, struct skynet_message *message) {
 
 void 
 skynet_context_endless(uint32_t handle) {
+	// 保留一个引用
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL) {
 		return;
 	}
+
+	// 打个死循环的标记
 	ctx->endless = true;
+
+	// 释放保留
 	skynet_context_release(ctx);
 }
 
 int 
 skynet_isremote(struct skynet_context * ctx, uint32_t handle, int * harbor) {
+	// 得到 handle 表示的是否是远程节点的结果
 	int ret = skynet_harbor_message_isremote(handle);
+
+	// 获取 handle 对应的 harbor id, 高 8 位
 	if (harbor) {
 		*harbor = (int)(handle >> HANDLE_REMOTE_SHIFT);
 	}
+
 	return ret;
 }
 
+/// skynet_context 对单个 skynet_message 做处理
 static void
 dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
+	// 保证初始化
 	assert(ctx->init);
+
 	CHECKCALLING_BEGIN(ctx)
+
+	// 存储当前线程, dispatch message 的 skynet_context 的 handle
+	// 这样在 ctx->cb 中也可以得到当前线程正在 dispatch message 的 skynet_context(handle)
 	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
+
+	// 拿到消息类型, 高 8 位存储
 	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
+
+	// 拿到数据的大小
 	size_t sz = msg->sz & HANDLE_MASK;
+
+	// 如果当前服务有日志文件, 将信息输出到日志文件中
 	if (ctx->logfile) {
 		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
 	}
+
+	// 每个 skynet_context 处理 skynet_message
 	if (!ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz)) {
+		// 消息处理成功释放掉 skynet_message 的 data 内存资源
+		// 注意, 在调用本方法(dispatch_message) 之前, 消息队列已经将 msg 从 queue 里面 pop 出来了.
+		// 如果这里不释放掉 message 的 data 资源, 那么将会造成内存泄漏.
 		skynet_free(msg->data);
 	} 
 	CHECKCALLING_END(ctx)
@@ -294,6 +359,7 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 void 
 skynet_context_dispatchall(struct skynet_context * ctx) {
 	// for skynet_error
+	// 用于 skynet_error
 	struct skynet_message msg;
 	struct message_queue *q = ctx->queue;
 	while (!skynet_mq_pop(q,&msg)) {
@@ -304,55 +370,89 @@ skynet_context_dispatchall(struct skynet_context * ctx) {
 struct message_queue * 
 skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
 	if (q == NULL) {
+		// 从全局消息队列中弹出一个 message_queue
 		q = skynet_globalmq_pop();
-		if (q==NULL)
+
+		// 如果当前一个 message_queue 都没, 那么函数返回
+		if (q == NULL)
 			return NULL;
 	}
 
+	// 拿到 message_queue 的 handle
 	uint32_t handle = skynet_mq_handle(q);
 
+	// 在使用 handle 拿到对应的 context, 保留引用
 	struct skynet_context * ctx = skynet_handle_grab(handle);
+
+	// 如果不存在对应的 skynet_context, 使用另外的 message_queue
 	if (ctx == NULL) {
 		struct drop_t d = { handle };
+
+		// 1. 如果 q 没有打 release 标记, 那么 skynet_mq_release 会将 q 再压入到 global_queue 里面.
+		// 2. 如果 q 打了 release 标记, 那么 skynet_mq_release 会将 q 里面的 message 资源全部释放掉, 同时释放掉 q 自身
 		skynet_mq_release(q, drop_message, &d);
+
+		// 1. 如果是基于 1 的情况的 q, 函数返回的还是 q;
+		// 2. 如果是基于 2 的情况的 q, 函数返回的是 global_queue 的链头元素;
 		return skynet_globalmq_pop();
 	}
 
-	int i,n=1;
+	int i, n = 1;
 	struct skynet_message msg;
 
-	for (i=0;i<n;i++) {
-		if (skynet_mq_pop(q,&msg)) {
+	for (i = 0; i < n; i++) {
+		
+		// 从 mq 里面弹出 1 个 skynet_message
+		if (skynet_mq_pop(q, &msg)) {	// 弹出消息失败
+
+			// 释放引用
 			skynet_context_release(ctx);
+
+			// 拿到下一个链头元素
 			return skynet_globalmq_pop();
-		} else if (i==0 && weight >= 0) {
+
+		// 决定接下来循环的次数
+		} else if (i == 0 && weight >= 0) {		// 弹出消息成功
 			n = skynet_mq_length(q);
-			n >>= weight;
+			n >>= weight;	// >> 每右移一位表示除 2
 		}
+
+		// 判断当前 queue 存储的消息数量是否超载了
 		int overload = skynet_mq_overload(q);
 		if (overload) {
 			skynet_error(ctx, "May overload, message queue length = %d", overload);
 		}
 
+		// 开启监控器
 		skynet_monitor_trigger(sm, msg.source, handle);
 
+		// 如果没有处理函数, 那么直接将 skynet_message 的内存资源释放
 		if (ctx->cb == NULL) {
 			skynet_free(msg.data);
+
+		// context 处理 skynet_message 消息
 		} else {
 			dispatch_message(ctx, &msg);
 		}
 
-		skynet_monitor_trigger(sm, 0,0);
+		// 恢复监控器
+		skynet_monitor_trigger(sm, 0, 0);
 	}
 
+	// 保证处理 context->queue 和 q 是相同的
 	assert(q == ctx->queue);
-	struct message_queue *nq = skynet_globalmq_pop();
+
+	// 弹出下次使用的 queue
+	struct message_queue * nq = skynet_globalmq_pop();
 	if (nq) {
-		// If global mq is not empty , push q back, and return next queue (nq)
+		// If global mq is not empty, push q back, and return next queue (nq)
 		// Else (global mq is empty or block, don't push q back, and return q again (for next dispatch)
+		// 
 		skynet_globalmq_push(q);
 		q = nq;
-	} 
+	}
+
+	// 释放引用
 	skynet_context_release(ctx);
 
 	return q;

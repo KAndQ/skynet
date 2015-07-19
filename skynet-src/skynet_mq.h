@@ -1,5 +1,8 @@
 /**
  * 实现 message_queue 的管理.
+ * 内部有一个 global_queue, 负责管理 message_queue.
+ * message_queue 和 skynet_context 是 1 对 1 的关系, global_queue 和 message_queue 是 1 对多的关系, 
+ * 当前 skynet_context 成功初始化完成之后会将 context 的 queue 连接到 global_queue 链表上. 
  */
 
 #ifndef SKYNET_MESSAGE_QUEUE_H
