@@ -61,7 +61,7 @@ struct skynet_context {
 struct skynet_node {
 	int total;						// skynet_context 的 总数量
 	int init;						// 是否初始化
-	uint32_t monitor_exit;
+	uint32_t monitor_exit;			// 每个 skynet_context 在 exit 时会发送消息给 monitor_exit 对应的 skynet_context
 
 	// 概念及作用
 	// 在单线程程序中，我们经常要用到"全局变量"以实现多个函数间共享数据。在多线程环境下，由于数据空间是共享的，因此全局变量也为所有线程所共有。
@@ -435,19 +435,20 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 			dispatch_message(ctx, &msg);
 		}
 
-		// 恢复监控器
+		// 关闭监控器
 		skynet_monitor_trigger(sm, 0, 0);
 	}
 
 	// 保证处理 context->queue 和 q 是相同的
 	assert(q == ctx->queue);
 
-	// 弹出下次使用的 queue
+	// 弹出下次使用的 message_queue
 	struct message_queue * nq = skynet_globalmq_pop();
 	if (nq) {
 		// If global mq is not empty, push q back, and return next queue (nq)
 		// Else (global mq is empty or block, don't push q back, and return q again (for next dispatch)
-		// 
+		// 如果全局的 mq 非空, 再将 q 放入到链表的尾部, 返回下一个 queue(nq)
+		// 否则如果全局的 mq 是空, 将不再把 q 压入到尾部, 随后再一次返回 q(为下一次 dispatch)
 		skynet_globalmq_push(q);
 		q = nq;
 	}
@@ -458,13 +459,15 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 	return q;
 }
 
+/// 将 addr 的内容复制到 name 里面
 static void
 copy_name(char name[GLOBALNAME_LENGTH], const char * addr) {
 	int i;
-	for (i=0;i<GLOBALNAME_LENGTH && addr[i];i++) {
+	for (i = 0; i < GLOBALNAME_LENGTH && addr[i]; i++) {
 		name[i] = addr[i];
 	}
-	for (;i<GLOBALNAME_LENGTH;i++) {
+
+	for (; i<GLOBALNAME_LENGTH; i++) {
 		name[i] = '\0';
 	}
 }
@@ -474,63 +477,94 @@ skynet_queryname(struct skynet_context * context, const char * name) {
 	switch(name[0]) {
 	case ':':
 		// 将字符串转换成无符号长整型数
-		return strtoul(name+1,NULL,16);
+		return strtoul(name + 1, NULL, 16);
 	case '.':
 		return skynet_handle_findname(name + 1);
 	}
-	skynet_error(context, "Don't support query global name %s",name);
+	skynet_error(context, "Don't support query global name %s", name);
 	return 0;
 }
 
+/// 撤销 handle. 如果 handle == 0, 那么撤销的是 context, 否则撤销 handle.
 static void
 handle_exit(struct skynet_context * context, uint32_t handle) {
+
+	// 决定撤销的 handle, 并且打印信息
 	if (handle == 0) {
 		handle = context->handle;
 		skynet_error(context, "KILL self");
 	} else {
 		skynet_error(context, "KILL :%0x", handle);
 	}
+
+	// 发送消息给 moniter_exit 对应的 skynet_context
 	if (G_NODE.monitor_exit) {
 		skynet_send(context, handle, G_NODE.monitor_exit, PTYPE_CLIENT, 0, NULL, 0);
 	}
+
+	// 撤销 handle
 	skynet_handle_retire(handle);
 }
 
 // skynet command
+// skynet 命令
 
 struct command_func {
-	const char *name;
-	const char * (*func)(struct skynet_context * context, const char * param);
+	const char *name;	// 命令的名字
+	const char * (*func)(struct skynet_context * context, const char * param);	// 对应的回调函数接口声明
 };
 
+/// 给 context 添加计时器, skynet.timeout 用到这个命令
 static const char *
 cmd_timeout(struct skynet_context * context, const char * param) {
 	char * session_ptr = NULL;
+
+	// 一开始strtol()会扫描参数nptr字符串，跳过前面的空格字符，直到遇上数字或正负符号才开始做转换，
+	// 再遇到非数字或字符串结束时('\0')结束转换，并将结果返回。
+	// 若参数endptr不为NULL，则会将遇到不合条件而终止的nptr中的字符指针由endptr返回；若参数endptr为NULL，则会不返回非法字符串。
 	int ti = strtol(param, &session_ptr, 10);
+
+	// 生成信息的 session id
 	int session = skynet_context_newsession(context);
+
+	// 添加计时器
 	skynet_timeout(context->handle, ti, session);
+
+	// 记录结果数据
 	sprintf(context->result, "%d", session);
 	return context->result;
 }
 
+/// 在本节点内, 给 context 注册一个名字, skynet.register 和 skynet.self 用到这个命令
 static const char *
 cmd_reg(struct skynet_context * context, const char * param) {
+	// 如果没有 param 参数或者 param 为空字符串,
+	// 那么结果是 ":" + context->handle 的 16 进制字符串
 	if (param == NULL || param[0] == '\0') {
 		sprintf(context->result, ":%x", context->handle);
 		return context->result;
+
+	// 在本地服务给 context 注册名字, 名字开头符号必须是'.'
 	} else if (param[0] == '.') {
 		return skynet_handle_namehandle(context->handle, param + 1);
+
+	// 不支持注册全局(整个 skynet 网络)名字
 	} else {
 		skynet_error(context, "Can't register global name %s in C", param);
 		return NULL;
 	}
 }
 
+/// 在本节点内, 根据服务的名字查询, skynet.localname 和 skynet.queryservice 方法使用这个命令
 static const char *
 cmd_query(struct skynet_context * context, const char * param) {
 	if (param[0] == '.') {
+
+		// 查询到名字对应的 handle
 		uint32_t handle = skynet_handle_findname(param+1);
 		if (handle) {
+
+			// 记录结果数据
 			sprintf(context->result, ":%x", handle);
 			return context->result;
 		}
@@ -538,54 +572,74 @@ cmd_query(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+/// 在本节点内, 给 handle 注册一个名字, skynet.name 用到这个命令.
 static const char *
 cmd_name(struct skynet_context * context, const char * param) {
 	int size = strlen(param);
-	char name[size+1];
-	char handle[size+1];
-	sscanf(param,"%s %s",name,handle);
+	char name[size + 1];
+	char handle[size + 1];
+
+	// 从一个字符串中读进与指定格式相符的数据。
+	sscanf(param, "%s %s", name, handle);
+
+	// handle 格式判断
 	if (handle[0] != ':') {
 		return NULL;
 	}
-	uint32_t handle_id = strtoul(handle+1, NULL, 16);
+
+	// 拿到 handle 值
+	uint32_t handle_id = strtoul(handle + 1, NULL, 16);
+
+	// handle_id 校验
 	if (handle_id == 0) {
 		return NULL;
 	}
+
+	// name 格式判断
 	if (name[0] == '.') {
 		return skynet_handle_namehandle(handle_id, name + 1);
+
+	// 不能以全局格式命名
 	} else {
 		skynet_error(context, "Can't set global name %s in C", name);
 	}
+
 	return NULL;
 }
 
+/// 得到 skynet 节点从启动到目前的系统时间, skynet.now() 用到这个命令.
 static const char *
 cmd_now(struct skynet_context * context, const char * param) {
 	uint32_t ti = skynet_gettime();
-	sprintf(context->result,"%u",ti);
+	sprintf(context->result, "%u", ti);
 	return context->result;
 }
 
+/// 撤销当前 skynet_context, skynet.exit 中会使用到.
 static const char *
 cmd_exit(struct skynet_context * context, const char * param) {
 	handle_exit(context, 0);
 	return NULL;
 }
 
+/// 将 param 表示的字符串转化为对应的 handle
 static uint32_t
 tohandle(struct skynet_context * context, const char * param) {
 	uint32_t handle = 0;
+	// 从数字转化
 	if (param[0] == ':') {
-		handle = strtoul(param+1, NULL, 16);
+		handle = strtoul(param + 1, NULL, 16);
+	// 从名字转化
 	} else if (param[0] == '.') {
-		handle = skynet_handle_findname(param+1);
+		handle = skynet_handle_findname(param + 1);
 	} else {
-		skynet_error(context, "Can't convert %s to handle",param);
+		skynet_error(context, "Can't convert %s to handle", param);
 	}
 
 	return handle;
 }
 
+/// 撤销掉指定的 skynet_context, skynet.kill 中会使用到
 static const char *
 cmd_kill(struct skynet_context * context, const char * param) {
 	uint32_t handle = tohandle(context, param);
@@ -595,43 +649,66 @@ cmd_kill(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+/// 从本地加载动态链接库, 创建一个新的 skynet_context, skynet.launch 中会使用到
 static const char *
 cmd_launch(struct skynet_context * context, const char * param) {
+	
+	// 复制 param 的内容
 	size_t sz = strlen(param);
-	char tmp[sz+1];
-	strcpy(tmp,param);
+	char tmp[sz + 1];
+	strcpy(tmp, param);
+
 	char * args = tmp;
+
+	// 得到第一个参数字符串
 	char * mod = strsep(&args, " \t\r\n");
+
+	// 得到第二个参数字符串
 	args = strsep(&args, "\r\n");
-	struct skynet_context * inst = skynet_context_new(mod,args);
+
+	// 加载新的 skynet_context 模块
+	struct skynet_context * inst = skynet_context_new(mod, args);
+
 	if (inst == NULL) {
 		return NULL;
 	} else {
+		// 将新创建的 inst->handle 以 16 进制字符串的形式记录下来
 		id_to_hex(context->result, inst->handle);
 		return context->result;
 	}
 }
 
+/// 获得当前节点的全局环境变量, skynet.getenv 中使用
 static const char *
 cmd_getenv(struct skynet_context * context, const char * param) {
 	return skynet_getenv(param);
 }
 
+/// 设置当前节点的全局环境变量, skynet.setenv 中使用
 static const char *
 cmd_setenv(struct skynet_context * context, const char * param) {
 	size_t sz = strlen(param);
-	char key[sz+1];
+	char key[sz + 1];
+	
+	// 拿到第一个参数
 	int i;
-	for (i=0;param[i] != ' ' && param[i];i++) {
+	for (i = 0; param[i] != ' ' && param[i]; i++) {
 		key[i] = param[i];
 	}
+
+	// 保证 param 后面还是数据
 	if (param[i] == '\0')
 		return NULL;
 
+	// key 字符串
 	key[i] = '\0';
-	param += i+1;
+
+	// value 字符串
+	param += i + 1;
 	
-	skynet_setenv(key,param);
+	// 设置
+	skynet_setenv(key, param);
+	
 	return NULL;
 }
 
@@ -660,7 +737,7 @@ cmd_abort(struct skynet_context * context, const char * param) {
 
 static const char *
 cmd_monitor(struct skynet_context * context, const char * param) {
-	uint32_t handle=0;
+	uint32_t handle = 0;
 	if (param == NULL || param[0] == '\0') {
 		if (G_NODE.monitor_exit) {
 			// return current monitor serivce

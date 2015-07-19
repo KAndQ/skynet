@@ -98,7 +98,10 @@ void skynet_globalinit(void);
 // 进程关闭时资源释放, 只在 skynet_main 中使用.
 void skynet_globalexit(void);
 
-// 
+/**
+ * 初始化各个线程的私有变量
+ * @param m 使用的的初始化的值, 默认存储的值是 -m
+ */
 void skynet_initthread(int m);
 
 #endif

@@ -52,7 +52,6 @@ unpack 函数接收一个 lightuserdata 和一个整数 。即上面提到的 me
 lua 无法直接处理 C 指针，所以必须使用额外的 C 库导入函数来解码。skynet.tostring 就是这样的一个函数，它将这个 C 指针和长度翻译成 lua 的 string。
 
 接下来你可以使用 skynet.dispatch 注册 text 类别的处理方法了。当然，直接在 skynet.register_protocol 时传入 dispatch 函数也可以。
-
 --]===]
 -- 在 skynet 中注册新的消息类别.
 -- @param class 里面的字段参考上面的注释

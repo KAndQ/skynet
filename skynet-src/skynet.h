@@ -59,8 +59,8 @@ void skynet_error(struct skynet_context * context, const char *msg, ...);
 const char * skynet_command(struct skynet_context * context, const char * cmd , const char * parm);
 
 /**
- * 使用 name 查询到对应的 handle(整型), 这里类似在 lua 中调用 skynet.localname
- * @param context skynet_context
+ * 使用 name 在本节点查询到对应的 handle(整型), 这里类似在 lua 中调用 skynet.localname. 不支持全局查询.
+ * @param context skynet_context 用于 skynet_error 的 skynet_context
  * @param name 用来查询的名字, name 的格式会在 skynet_service.c 中详细说明, 也可以看 https://github.com/cloudwu/skynet/wiki/LuaAPI
  * @return 返回的 name 对应的 handle, 如果没有找到则返回 0.
  */
