@@ -503,7 +503,7 @@ remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int 
 	struct skynet_context * context = h->ctx;
 	if (harbor_id == h->id) {
 		// local message
-		skynet_send(context, source, destination , type | PTYPE_TAG_DONTCOPY, session, (void *)msg, sz);
+		skynet_send(context, source, destination, type | PTYPE_TAG_DONTCOPY, session, (void *)msg, sz);
 		return 1;
 	}
 

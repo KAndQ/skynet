@@ -53,7 +53,7 @@ uint32_t skynet_context_handle(struct skynet_context *);
 int skynet_context_push(uint32_t handle, struct skynet_message *message);
 
 /**
- * 将数据压入到 context 队列中
+ * 将数据封装为 skynet_message 压入到 context 队列中
  * @param context skynet_context
  * @param msg 数据
  * @param sz 数据大小

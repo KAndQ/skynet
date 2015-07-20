@@ -53,8 +53,8 @@ void skynet_error(struct skynet_context * context, const char *msg, ...);
  * 执行 skynet 中指定的命令函数
  * @param context skynet_context
  * @param cmd 执行的命令字符串, 可以在 skynet_server.c 的 cmd_funcs 中看到支持的命令
- * @param parm 使用 cmd 得到执行函数传入的参数
- * @return 命令对应执行函数的返回值
+ * @param parm 执行命令函数时传入的参数
+ * @return 对应命令执行函数的返回值, 字符串类型
  */
 const char * skynet_command(struct skynet_context * context, const char * cmd , const char * parm);
 
@@ -71,19 +71,19 @@ uint32_t skynet_queryname(struct skynet_context * context, const char * name);
  * @param context skynet_context 
  * @param source 发送源, 为 0 表示发送源是 context
  * @param destination 目标服务, 为 0 表示不发送给其他服务
- * @param type 就是本文件上面定义的消息类型
+ * @param type 就是本文件上面定义的消息类型, PTYPE_*
  * @param session 大部分消息工作在请求回应模式下。
  * 即，一个服务向另一个服务发起一个请求，而后收到请求的服务在处理完请求消息后，回复一条消息。
  * session 是由发起请求的服务生成的，对它自己唯一的消息标识。回应方在回应时，将 session 带回。
  * 这样发送方才能识别出哪条消息是针对哪条的回应。session 是一个非负整数，当一条消息不需要回应时，按惯例，使用 0 这个特殊的 session 号。
  * session 由 skynet 框架生成管理，通常不需要使用者关心。
- * @param msg 发送的内容
+ * @param msg 发送的内容, 会根据 type 参数决定是否需要复制, 如果需要复制, 那么复制出来的内存将由函数自己控制释放.
  * @param sz 发送内容的数据长度
  * @return 失败返回 -1, 否则返回与 session 相同的值
  */
 int skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * msg, size_t sz);
 
-/// 同上面的函数, 只是 destination 换成了使用服务注册的名字.
+/// 同上面的函数, 只是 destination 换成了使用 context 注册的名字.
 int skynet_sendname(struct skynet_context * context, uint32_t source, const char * destination , int type, int session, void * msg, size_t sz);
 
 /**
@@ -110,14 +110,14 @@ int skynet_isremote(struct skynet_context *, uint32_t handle, int * harbor);
 typedef int (*skynet_cb)(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz);
 
 /**
- * 将 ud 和 cb 传递给 context
+ * 将 ud 和 cb 传递给 context, cb 是在 dispatch_message 时的回调.
  * @param context skynet_context
  * @param ud 对应 context->cb_ud
  * @param cb 对应 context->cb
  */
 void skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb);
 
-// 得到当前线程所存储的 handle 值, 在 skynet_server.c 中会详细介绍这个函数.
+/// 得到当前线程执行 dispatch_message 函数的 skynet_context 的 handle 值, 在 skynet_server.c 中会详细介绍这个函数.
 uint32_t skynet_current_handle(void);
 
 #endif

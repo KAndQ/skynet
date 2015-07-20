@@ -392,8 +392,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 		// 2. 如果 q 打了 release 标记, 那么 skynet_mq_release 会将 q 里面的 message 资源全部释放掉, 同时释放掉 q 自身
 		skynet_mq_release(q, drop_message, &d);
 
-		// 1. 如果是基于 1 的情况的 q, 函数返回的还是 q;
-		// 2. 如果是基于 2 的情况的 q, 函数返回的是 global_queue 的链头元素;
+		// 弹出下一个链表头元素
 		return skynet_globalmq_pop();
 	}
 
@@ -712,6 +711,7 @@ cmd_setenv(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+/// 得到 skynet 节点启动的系统时间, skynet.starttime() 中有使用到
 static const char *
 cmd_starttime(struct skynet_context * context, const char * param) {
 	uint32_t sec = skynet_gettime_fixsec();
@@ -719,6 +719,7 @@ cmd_starttime(struct skynet_context * context, const char * param) {
 	return context->result;
 }
 
+/// 得到 context 的 endless 标记值, skynet.endless() 中有使用到
 static const char *
 cmd_endless(struct skynet_context * context, const char * param) {
 	if (context->endless) {
@@ -729,12 +730,15 @@ cmd_endless(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+/// 关闭掉所有的 skynet_context, skynet.abord() 中有使用到
 static const char *
 cmd_abort(struct skynet_context * context, const char * param) {
 	skynet_handle_retireall();
 	return NULL;
 }
 
+// 添加 skynet_context 在关闭时的监控器, 这个监控器其实也是一个 skynet_context,
+// skynet.monitor 中有使用到.
 static const char *
 cmd_monitor(struct skynet_context * context, const char * param) {
 	uint32_t handle = 0;
@@ -752,6 +756,7 @@ cmd_monitor(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+/// 得到当前 skynet_context 的 queue 长度, skynet.mqlen() 中有使用到
 static const char *
 cmd_mqlen(struct skynet_context * context, const char * param) {
 	int len = skynet_mq_length(context->queue);
@@ -759,40 +764,59 @@ cmd_mqlen(struct skynet_context * context, const char * param) {
 	return context->result;
 }
 
+// 打开指定 skynet_context 的日志文件, 指定的 skynet_context 通过 param 传入 handle 拿到.
+// 在 command.LOGLAUNCH 和 COMMAND.logon 中有使用到.
 static const char *
 cmd_logon(struct skynet_context * context, const char * param) {
+	// 拿到 handle
 	uint32_t handle = tohandle(context, param);
 	if (handle == 0)
 		return NULL;
+
+	// 拿到 skynet_context
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL)
 		return NULL;
-	FILE *f = NULL;
+
+	FILE * f = NULL;
 	FILE * lastf = ctx->logfile;
+
+	// 保证之前没有打开过文件
 	if (lastf == NULL) {
+		// 打开 handle 对应的 skynet_context 的日志文件
 		f = skynet_log_open(context, handle);
 		if (f) {
+			// __sync_bool_compare_and_swap: 如果第 1 个参数和第 2 个参数值相等, 那么把第 3 个参数的值赋给第 1 个参数.
 			if (!__sync_bool_compare_and_swap(&ctx->logfile, NULL, f)) {
 				// logfile opens in other thread, close this one.
+				// 如果日志文件已经被其他线程打开了, 那么关闭掉当前的.
 				fclose(f);
 			}
 		}
 	}
 	skynet_context_release(ctx);
+
 	return NULL;
 }
 
+// 关闭指定 skynet_context 的日志文件, 指定的 skynet_context 通过 param 传入 handle 拿到.
+// 在 COMMAND.logoff 中使用到.
 static const char *
 cmd_logoff(struct skynet_context * context, const char * param) {
+	// 拿到 handle
 	uint32_t handle = tohandle(context, param);
 	if (handle == 0)
 		return NULL;
+
+	// 拿到 skynet_context
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL)
 		return NULL;
+
 	FILE * f = ctx->logfile;
 	if (f) {
 		// logfile may close in other thread
+		// 日志文件可能在其他线程被关掉
 		if (__sync_bool_compare_and_swap(&ctx->logfile, f, NULL)) {
 			skynet_log_close(context, f, handle);
 		}
@@ -801,23 +825,33 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
+// 对指定的 skynet_context 调用 skynet_module_instance_signal 方法.
+// 在 COMMAND.signal 中使用到.
 static const char *
 cmd_signal(struct skynet_context * context, const char * param) {
+	// 拿到 handle
 	uint32_t handle = tohandle(context, param);
 	if (handle == 0)
 		return NULL;
+
+	// 拿到 skynet_context
 	struct skynet_context * ctx = skynet_handle_grab(handle);
 	if (ctx == NULL)
 		return NULL;
+
+	// 拿到 sign 参数值
 	param = strchr(param, ' ');
 	int sig = 0;
 	if (param) {
 		sig = strtol(param, NULL, 0);
 	}
+
 	// NOTICE: the signal function should be thread safe.
+	// 注意: 这个信号函数应该保证是线程安全的.
 	skynet_module_instance_signal(ctx->mod, ctx->instance, sig);
 
 	skynet_context_release(ctx);
+
 	return NULL;
 }
 
@@ -846,6 +880,8 @@ static struct command_func cmd_funcs[] = {
 const char * 
 skynet_command(struct skynet_context * context, const char * cmd , const char * param) {
 	struct command_func * method = &cmd_funcs[0];
+
+	// 遍历搜索
 	while(method->name) {
 		if (strcmp(cmd, method->name) == 0) {
 			return method->func(context, param);
@@ -856,46 +892,63 @@ skynet_command(struct skynet_context * context, const char * cmd , const char * 
 	return NULL;
 }
 
+/// 对传入的参数进行过滤, session, data, sz
 static void
 _filter_args(struct skynet_context * context, int type, int *session, void ** data, size_t * sz) {
-	int needcopy = !(type & PTYPE_TAG_DONTCOPY);
-	int allocsession = type & PTYPE_TAG_ALLOCSESSION;
+	int needcopy = !(type & PTYPE_TAG_DONTCOPY);		// 复制
+	int allocsession = type & PTYPE_TAG_ALLOCSESSION;	// 分配 session
+
+	// 拿到当前的 PTYPE_*
 	type &= 0xff;
 
+	// 分配一个新的 session
 	if (allocsession) {
 		assert(*session == 0);
 		*session = skynet_context_newsession(context);
 	}
 
+	// 复制数据, 将 *data 的数据复制到新分配的内存空间中
 	if (needcopy && *data) {
-		char * msg = skynet_malloc(*sz+1);
+		char * msg = skynet_malloc(*sz + 1);
 		memcpy(msg, *data, *sz);
 		msg[*sz] = '\0';
 		*data = msg;
 	}
 
+	// 高 8 位存储 PTYPE_*
 	*sz |= type << HANDLE_REMOTE_SHIFT;
 }
 
 int
-skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
+skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination, int type, int session, void * data, size_t sz) {
+	// 数据大小的判断
 	if ((sz & HANDLE_MASK) != sz) {
 		skynet_error(context, "The message to %x is too large (sz = %lu)", destination, sz);
 		skynet_free(data);
 		return -1;
 	}
+
+	// 参数过滤, 这个函数会根据 type 的值申请新的内存空间.
+	// issue: 如果对 data 进行了复制, 那么老的 data 资源由谁来管理呢?
 	_filter_args(context, type, &session, (void **)&data, &sz);
 
+	// 如果 source 为 0, 表示用 context 发送
 	if (source == 0) {
 		source = context->handle;
 	}
 
+	// 目的地址为 0, 将不会发送信息
 	if (destination == 0) {
 		return session;
 	}
+
+	// 远程节点则使用 harbor 发送
 	if (skynet_harbor_message_isremote(destination)) {
+		// 这里分配了新的内存空间
 		struct remote_message * rmsg = skynet_malloc(sizeof(*rmsg));
 		rmsg->destination.handle = destination;
+		
+		// 数据会在 service_harbor.c 的 mainloop 函数里面将这个数据释放掉.
 		rmsg->message = data;
 		rmsg->sz = sz;
 		skynet_harbor_send(rmsg, source, session);
@@ -903,9 +956,12 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 		struct skynet_message smsg;
 		smsg.source = source;
 		smsg.session = session;
+
+		// 数据在 dispatch_message 中被删除掉
 		smsg.data = data;
 		smsg.sz = sz;
 
+		// 压入到目标 skynet_context 的队列中
 		if (skynet_context_push(destination, &smsg)) {
 			skynet_free(data);
 			return -1;
@@ -915,13 +971,16 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 }
 
 int
-skynet_sendname(struct skynet_context * context, uint32_t source, const char * addr , int type, int session, void * data, size_t sz) {
+skynet_sendname(struct skynet_context * context, uint32_t source, const char * addr, int type, int session, void * data, size_t sz) {
+	// 数据大小的判断
 	if (source == 0) {
 		source = context->handle;
 	}
+
+	// 拿到目标地址的值
 	uint32_t des = 0;
 	if (addr[0] == ':') {
-		des = strtoul(addr+1, NULL, 16);
+		des = strtoul(addr + 1, NULL, 16);
 	} else if (addr[0] == '.') {
 		des = skynet_handle_findname(addr + 1);
 		if (des == 0) {
@@ -930,6 +989,8 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 			}
 			return -1;
 		}
+		
+	// 目标地址在其他节点
 	} else {
 		_filter_args(context, type, &session, (void **)&data, &sz);
 
