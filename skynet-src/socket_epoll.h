@@ -133,7 +133,7 @@ sp_wait(int efd, struct event *e, int max) {
 		e[i].s = ev[i].data.ptr;	// 数据指针
 
 		unsigned flag = ev[i].events;
-		e[i].write = (flag & EPOLLOUT) != 0;	// 可写内容
+		e[i].write = (flag & EPOLLOUT) != 0;	// 可写标记
 		e[i].read = (flag & EPOLLIN) != 0;		// 可读标记
 	}
 
@@ -148,6 +148,7 @@ sp_nonblocking(int fd) {
 		return;
 	}
 
+	// 设置为非阻塞的
 	fcntl(fd, F_SETFL, flag | O_NONBLOCK);
 }
 
