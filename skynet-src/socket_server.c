@@ -30,21 +30,24 @@
 #define SOCKET_TYPE_PACCEPT 7
 #define SOCKET_TYPE_BIND 8
 
+// 最大的 socket 连接数
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
 #define PRIORITY_HIGH 0
 #define PRIORITY_LOW 1
 
+// id 和 MAX_SOCKET 做 hash 运算
 #define HASH_ID(id) (((unsigned)id) % MAX_SOCKET)
 
-#define PROTOCOL_TCP 0
-#define PROTOCOL_UDP 1
-#define PROTOCOL_UDPv6 2
+#define PROTOCOL_TCP 0		// tcp 协议, ipv4
+#define PROTOCOL_UDP 1		// udp 协议, ipv4
+#define PROTOCOL_UDPv6 2	// udp 协议, ipv6
 
 #define UDP_ADDRESS_SIZE 19	// ipv6 128bit + port 16bit + 1 byte type
 
-#define MAX_UDP_PACKAGE 65535
+#define MAX_UDP_PACKAGE 65535	// 最大的 UDP 包的数量
 
+// 写数据的缓存
 struct write_buffer {
 	struct write_buffer * next;
 	void *buffer;
@@ -54,9 +57,15 @@ struct write_buffer {
 	uint8_t udp_address[UDP_ADDRESS_SIZE];
 };
 
+// size_t offsetof( structName, memberName );
+// 该宏用于求结构体中一个成员在该结构体中的偏移量.
+// 第一个参数是结构体的名字，第二个参数是结构体成员的名字。
+// 该宏返回结构体structName中成员memberName的偏移量。偏移量是size_t类型的。
 #define SIZEOF_TCPBUFFER (offsetof(struct write_buffer, udp_address[0]))
+
 #define SIZEOF_UDPBUFFER (sizeof(struct write_buffer))
 
+// 写数据的链表数据结构
 struct wb_list {
 	struct write_buffer * head;
 	struct write_buffer * tail;
@@ -154,6 +163,7 @@ struct request_udp {
 
 /*
 	The first byte is TYPE
+	第一个字节是类型
 
 	S Start socket
 	B Bind socket
@@ -188,27 +198,51 @@ struct request_package {
 };
 
 union sockaddr_all {
+	// 用于存储参与（IP）套接字通信的计算机上的一个internet协议（IP）地址。
+	// 为了统一地址结构的表示方法 ，统一接口函数，使得不同的地址结构可以被bind()、connect()、recvfrom()、sendto()等函数调用。
+	// 但一般的编程中并不直接对此数据结构进行操作，而使用另一个与之等价的数据结构sockaddr_in, 两者大小都是16字节，所以二者之间可以进行切换。
 	struct sockaddr s;
+
+	// 此数据结构用做bind、connect、recvfrom、sendto等函数的参数，指明地址信息。
+	// 但一般编程中并不直接针对此数据结构操作，而是使用另一个与sockaddr等价的数据结构.
 	struct sockaddr_in v4;
+
+	// 同上, 但是是 ipv6 的协议.
 	struct sockaddr_in6 v6;
 };
 
+// 发送数据对象
 struct send_object {
-	void * buffer;
-	int sz;
+	void * buffer;	// 数据的指针
+	int sz;			// 数据的大小
+
+	// 释放资源的函数接口定义
 	void (*free_func)(void *);
 };
 
+// memory macro utils
 #define MALLOC skynet_malloc
 #define FREE skynet_free
 
+/**
+ * 初始化 send_object 结构体
+ * @param ss socket_server 结构体
+ * @param so send_object 结构体, 待初始化的数据
+ * @param object 数据指针
+ * @param sz 数据大小. 如果小于 1 则使用 socket_object_interface 初始化 send_object; 否则直接赋值初始化.
+ * @return 使用 socket_object_interface 初始化返回 true, 否则返回 false
+ */
 static inline bool
 send_object_init(struct socket_server *ss, struct send_object *so, void *object, int sz) {
+	
+	// 使用 socket_server 的 socket_object_interface 初始化
 	if (sz < 0) {
 		so->buffer = ss->soi.buffer(object);
 		so->sz = ss->soi.size(object);
 		so->free_func = ss->soi.free;
 		return true;
+
+	// 直接赋值
 	} else {
 		so->buffer = object;
 		so->sz = sz;
@@ -217,6 +251,7 @@ send_object_init(struct socket_server *ss, struct send_object *so, void *object,
 	}
 }
 
+/// 释放 write_buffer 内存资源, 会根据 wb->userobject 的值选择不同的释放方式.
 static inline void
 write_buffer_free(struct socket_server *ss, struct write_buffer *wb) {
 	if (wb->userobject) {
@@ -227,6 +262,7 @@ write_buffer_free(struct socket_server *ss, struct write_buffer *wb) {
 	FREE(wb);
 }
 
+/// 
 static void
 socket_keepalive(int fd) {
 	int keepalive = 1;
@@ -256,6 +292,7 @@ reserve_id(struct socket_server *ss) {
 	return -1;
 }
 
+/// 清空 wb_list 链表
 static inline void
 clear_wb_list(struct wb_list *list) {
 	list->head = NULL;

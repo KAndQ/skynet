@@ -1,3 +1,7 @@
+/**
+ * socket 的通信实现, 与之关联的只有 socket_pool.h 类型
+ */
+
 #ifndef skynet_socket_server_h
 #define skynet_socket_server_h
 
@@ -16,7 +20,9 @@ struct socket_server;
 struct socket_message {
 	int id;
 	uintptr_t opaque;
-	int ud;	// for accept, ud is listen id ; for data, ud is size of data 
+
+    // 对于 accpet, ud 是侦听的 id; 对于 data, ud 是数据的大小
+	int ud;	// for accept, ud is listen id; for data, ud is size of data 
 	char * data;
 };
 
