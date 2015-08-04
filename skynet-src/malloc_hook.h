@@ -6,6 +6,7 @@
 #define SKYNET_MALLOC_HOOK_H
 
 #include <stdlib.h>
+#include <lua.h>
 
 // 得到当前已经使用的内存大小
 extern size_t malloc_used_memory(void);
@@ -26,6 +27,7 @@ extern int    mallctl_opt(const char* name, int* newval);
 
 // 打印当前所有使用的内存信息
 extern void   dump_c_mem(void);
+extern int    dump_mem_lua(lua_State *L);
 
 #endif /* SKYNET_MALLOC_HOOK_H */
 
