@@ -24,19 +24,19 @@ struct event {
 static bool sp_invalid(poll_fd fd);
 
 /**
- * 创建 poll 的句柄
+ * 创建 event pool, 并返回句柄
  * @return 返回可用的句柄
  */
 static poll_fd sp_create();
 
 /**
- * 关闭创建的 poll
- * @param fd poll 的句柄
+ * 关闭创建的 event pool
+ * @param fd event pool 的句柄
  */
 static void sp_release(poll_fd fd);
 
 /**
- * 将 sock fd 添加到 poll 中
+ * 将 sock fd 添加到 event pool 中
  * @param fd 之前创建的 poll 句柄
  * @param sock socket 的 fd
  * @param 关联的用户数据
@@ -45,15 +45,15 @@ static void sp_release(poll_fd fd);
 static int sp_add(poll_fd fd, int sock, void *ud);
 
 /**
- * 从 poll 中删除掉 sock fd
+ * 从 event pool 中删除掉 sock fd
  * @param fd 之前创建的 poll 句柄
  * @param sock socket 的 fd
  */
 static void sp_del(poll_fd fd, int sock);
 
 /**
- * 控制 poll 是否侦听 sock 的可写状态
- * @param poll_fd 之前创建的 poll 句柄
+ * 控制 event pool 是否侦听 sock 的可写状态
+ * @param poll_fd 之前创建的 event pool 句柄
  * @param sock socket fd
  * @param ud 关联的用户数据
  * @param enable 为 true 则是可写状态, 否则只是侦听可读
@@ -61,8 +61,8 @@ static void sp_del(poll_fd fd, int sock);
 static void sp_write(poll_fd, int sock, void *ud, bool enable);
 
 /**
- * 等待当前产生的时间, 并将产生的事件记录下来传递给 struct event
- * @param poll_fd 之前创建的 poll 句柄
+ * 等待当前产生的事件, 并将产生的事件记录下来传递给 struct event
+ * @param poll_fd 之前创建的 event pool 句柄
  * @param e 记录事件的 struct event
  * @param max 能够处理事件的最大数量
  * @return 发生事件的数量

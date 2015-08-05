@@ -20,6 +20,7 @@
 #define MAX_SOCKET_P 16
 #define MAX_EVENT 64
 #define MIN_READ_BUFFER 64
+
 #define SOCKET_TYPE_INVALID 0
 #define SOCKET_TYPE_RESERVE 1
 #define SOCKET_TYPE_PLISTEN 2
@@ -33,8 +34,9 @@
 // 最大的 socket 连接数
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
-#define PRIORITY_HIGH 0
-#define PRIORITY_LOW 1
+// 优先级
+#define PRIORITY_HIGH 0		// 高
+#define PRIORITY_LOW 1		// 低
 
 // id 和 MAX_SOCKET 做 hash 运算
 #define HASH_ID(id) (((unsigned)id) % MAX_SOCKET)
@@ -47,9 +49,9 @@
 
 #define MAX_UDP_PACKAGE 65535	// 最大的 UDP 包的数量
 
-// 写数据的缓存
+// 写数据的缓存, 这是一个链表
 struct write_buffer {
-	struct write_buffer * next;
+	struct write_buffer * next;	// 关联的下一个 write_buffer
 	void *buffer;
 	char *ptr;
 	int sz;
@@ -57,27 +59,30 @@ struct write_buffer {
 	uint8_t udp_address[UDP_ADDRESS_SIZE];
 };
 
-// size_t offsetof( structName, memberName );
+// size_t offsetof(structName, memberName);
 // 该宏用于求结构体中一个成员在该结构体中的偏移量.
 // 第一个参数是结构体的名字，第二个参数是结构体成员的名字。
 // 该宏返回结构体structName中成员memberName的偏移量。偏移量是size_t类型的。
+
+// 得到 tcp 写缓存 数据结构的大小
 #define SIZEOF_TCPBUFFER (offsetof(struct write_buffer, udp_address[0]))
 
+// 得到 udp 写缓存 数据结构的大小
 #define SIZEOF_UDPBUFFER (sizeof(struct write_buffer))
 
 // 写数据的链表数据结构
 struct wb_list {
-	struct write_buffer * head;
-	struct write_buffer * tail;
+	struct write_buffer * head;		// 链表的首指针
+	struct write_buffer * tail;		// 链表的尾指针
 };
 
 struct socket {
 	uintptr_t opaque;
-	struct wb_list high;
-	struct wb_list low;
+	struct wb_list high;	// 写缓存数据的高优先级链表
+	struct wb_list low;		// 写缓存数据的低优先级链表
 	int64_t wb_size;
-	int fd;
-	int id;
+	int fd;					// 关联的 socket fd
+	int id;					// 在 socket_server 中的 id
 	uint16_t protocol;
 	uint16_t type;
 	union {
@@ -86,17 +91,18 @@ struct socket {
 	} p;
 };
 
+// socket_server 服务对象
 struct socket_server {
-	int recvctrl_fd;
-	int sendctrl_fd;
+	int recvctrl_fd;		// pipe 函数的读取端
+	int sendctrl_fd;		// pipe 函数的写入端
 	int checkctrl;
-	poll_fd event_fd;
-	int alloc_id;
+	poll_fd event_fd;		// event pool 的文件描述符
+	int alloc_id;			// 分配的 id 计数
 	int event_n;
 	int event_index;
 	struct socket_object_interface soi;
-	struct event ev[MAX_EVENT];
-	struct socket slot[MAX_SOCKET];
+	struct event ev[MAX_EVENT];			// 从 event poll 得到事件的集合
+	struct socket slot[MAX_SOCKET];		// 连接的 socket 集合
 	char buffer[MAX_INFO];
 	uint8_t udpbuffer[MAX_UDP_PACKAGE];
 	fd_set rfds;
@@ -216,7 +222,7 @@ struct send_object {
 	void * buffer;	// 数据的指针
 	int sz;			// 数据的大小
 
-	// 释放资源的函数接口定义
+	// 释放资源的函数接口声明
 	void (*free_func)(void *);
 };
 
@@ -262,28 +268,45 @@ write_buffer_free(struct socket_server *ss, struct write_buffer *wb) {
 	FREE(wb);
 }
 
-/// 
+/// 对 fd 对应的 sock 开启 keepalive 功能.
 static void
 socket_keepalive(int fd) {
 	int keepalive = 1;
-	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));  
+
+	// http://baike.baidu.com/link?url=VOPva4krboHp01brpVHJXqS226onNoCSHcfz96UtIzPYCmPd0JGsXvEUkHQ1CSoJ4MLWTP11ykk4ngr7sR0JRq
+	// int setsockopt(int sockfd, int level, int optname,const void *optval, socklen_t optlen);
+	// 用于任意类型、任意状态套接口的设置选项值。尽管在不同协议层上存在选项，但本函数仅定义了最高的“套接口”层次上的选项。
+	// sockfd：标识一个套接口的描述字。
+	// level：标识了选项应用的协议. 如果选项是通用的套接字层次选项, 则 level 设置成 SOL_SOCKET, 否则, level 设置成控制这个选项的协议编号, 对于 TCP 选项, 
+	//	level 是 IPPROTO_TCP, 对于 IP, level 是 IPPROTO_IP/IPPROTO_IPV6. 
+	// optname：需设置的选项。
+	// optval：指针，指向存放选项待设置的新值的缓冲区。
+	// optlen：optval缓冲区长度。
+
+	// level 定义的层次: 支持 SOL_SOCKET, IPPROTO_TCP, IPPROTO_IP 和 IPPROTO_IPV6。
+	// 各个层次的选项值请参考: http://wenku.baidu.com/link?url=tiQDv_PRHTuKYeKgHoAMWvAfw7WQfOxtma2F6kHob2chvb77UNIVkNZKPmWoiDyPtfTSS4uNKSNywGRCYCNwRVOQHR_2Kmm221b4dgE8utO
+	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));
 }
 
+/// 当 socket 的 type 是 INVALID 的时候, 获得该 id. 如果没有可用的 id, 返回 -1
 static int
 reserve_id(struct socket_server *ss) {
 	int i;
 	for (i=0;i<MAX_SOCKET;i++) {
 		int id = __sync_add_and_fetch(&(ss->alloc_id), 1);
 		if (id < 0) {
+			// 进行 & 位操作, 将第 32 位符号位清除
 			id = __sync_and_and_fetch(&(ss->alloc_id), 0x7fffffff);
 		}
+
+		// 获得对应的 socket
 		struct socket *s = &ss->slot[HASH_ID(id)];
 		if (s->type == SOCKET_TYPE_INVALID) {
 			if (__sync_bool_compare_and_swap(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				s->id = id;
 				s->fd = -1;
 				return id;
-			} else {
+			} else {	// 如果其他线程使用了该 socket, 从当前的索引开始重新遍历
 				// retry
 				--i;
 			}
@@ -303,16 +326,28 @@ struct socket_server *
 socket_server_create() {
 	int i;
 	int fd[2];
+
+	// 创建 poll
 	poll_fd efd = sp_create();
 	if (sp_invalid(efd)) {
 		fprintf(stderr, "socket-server: create event pool failed.\n");
 		return NULL;
 	}
+
+	// http://www.cnblogs.com/kunhu/p/3608109.html
+	// int pipe(int filedes[2]);
+	// 函数说明： pipe()会建立管道，并将文件描述词由参数filedes数组返回, 用于进程间通信.
+	// 		filedes[0]为管道里的读取端
+	// 		filedes[1]则为管道的写入端
+	// 返回值：若成功则返回 0，否则返回-1，错误原因存于errno中。
+	// 因为后面没有调用 fork() 函数, 所以 fd[1] >>>> fd[0]
 	if (pipe(fd)) {
 		sp_release(efd);
 		fprintf(stderr, "socket-server: create socket pair failed.\n");
 		return NULL;
 	}
+
+	// 将读的文件描述符添加到 event pool 中
 	if (sp_add(efd, fd[0], NULL)) {
 		// add recvctrl_fd to event poll
 		fprintf(stderr, "socket-server: can't add server fd to event pool.\n");
@@ -322,12 +357,17 @@ socket_server_create() {
 		return NULL;
 	}
 
+	// 分配 socket_server 的内存资源
 	struct socket_server *ss = MALLOC(sizeof(*ss));
+
 	ss->event_fd = efd;
 	ss->recvctrl_fd = fd[0];
 	ss->sendctrl_fd = fd[1];
 	ss->checkctrl = 1;
+	FD_ZERO(&ss->rfds);
+	assert(ss->recvctrl_fd < FD_SETSIZE);
 
+	// struct socket 初始化
 	for (i=0;i<MAX_SOCKET;i++) {
 		struct socket *s = &ss->slot[i];
 		s->type = SOCKET_TYPE_INVALID;
@@ -335,11 +375,11 @@ socket_server_create() {
 		clear_wb_list(&s->low);
 	}
 	ss->alloc_id = 0;
+
 	ss->event_n = 0;
 	ss->event_index = 0;
+
 	memset(&ss->soi, 0, sizeof(ss->soi));
-	FD_ZERO(&ss->rfds);
-	assert(ss->recvctrl_fd < FD_SETSIZE);
 
 	return ss;
 }

@@ -21,11 +21,13 @@ struct socket_message {
 	int id;
 	uintptr_t opaque;
 
+    // for accept, ud is listen id; for data, ud is size of data.
     // 对于 accpet, ud 是侦听的 id; 对于 data, ud 是数据的大小
-	int ud;	// for accept, ud is listen id; for data, ud is size of data 
+	int ud;
 	char * data;
 };
 
+/// 创建 socket_server 对象
 struct socket_server * socket_server_create();
 void socket_server_release(struct socket_server *);
 int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);
@@ -59,13 +61,15 @@ int64_t socket_server_udp_send(struct socket_server *, int id, const struct sock
 // extract the address of the message, struct socket_message * should be SOCKET_UDP
 const struct socket_udp_address * socket_server_udp_address(struct socket_server *, struct socket_message *, int *addrsz);
 
+// socket 对象的操作接口
 struct socket_object_interface {
-	void * (*buffer)(void *);
-	int (*size)(void *);
-	void (*free)(void *);
+	void * (*buffer)(void *);      // 获得发送数据起始地址函数接口
+	int (*size)(void *);           // 获得发送数据大小的函数接口
+	void (*free)(void *);          // 释放数据资源的函数接口
 };
 
 // if you send package sz == -1, use soi.
+// 如果发送数据包的 sz 参数为 -1 时, 使用 soi. 该函数对参数 soi 指向的数值进行了复制.
 void socket_server_userobject(struct socket_server *, struct socket_object_interface *soi);
 
 #endif
