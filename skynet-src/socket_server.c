@@ -21,6 +21,7 @@
 #define MAX_EVENT 64
 #define MIN_READ_BUFFER 64
 
+// socket 的状态
 #define SOCKET_TYPE_INVALID 0
 #define SOCKET_TYPE_RESERVE 1
 #define SOCKET_TYPE_PLISTEN 2
@@ -34,7 +35,7 @@
 // 最大的 socket 连接数
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
 
-// 优先级
+// 数据发送优先级
 #define PRIORITY_HIGH 0		// 高
 #define PRIORITY_LOW 1		// 低
 
@@ -52,10 +53,12 @@
 // 写数据的缓存, 这是一个链表
 struct write_buffer {
 	struct write_buffer * next;	// 关联的下一个 write_buffer
-	void *buffer;
-	char *ptr;
-	int sz;
-	bool userobject;
+	void *buffer;				// 数据的起始地址
+	char *ptr;					// 剩余发送数据的起始地址, 这里有个小细节, ptr 是 char * 类型, 指针每次的变化是 1 个字节. 可以参考 send_list_tcp 函数
+	int sz;						// 剩余发送数据的大小
+	bool userobject;			// 判断 buffer 是否是用户对象, 用户对象的内存控制由 socker_server 的 (soi)socket_object_interface 来决定
+
+	// udp 地址信息, 0 字节存储协议类型; 1, 2 字节存储端口号; 剩下的是地址数据, 对于 IPv4 使用 4 个字节存储, 对于 IPv6 使用 16 个字节存储;
 	uint8_t udp_address[UDP_ADDRESS_SIZE];
 };
 
@@ -80,14 +83,14 @@ struct socket {
 	uintptr_t opaque;
 	struct wb_list high;	// 写缓存数据的高优先级链表
 	struct wb_list low;		// 写缓存数据的低优先级链表
-	int64_t wb_size;
+	int64_t wb_size;		// 写数据的总大小, high + low
 	int fd;					// 关联的 socket fd
 	int id;					// 在 socket_server 中的 id
-	uint16_t protocol;
-	uint16_t type;
+	uint16_t protocol;		// socket 支持的协议类型, PROTOCOL_TCP, PROTOCOL_UDP, PROTOCOL_UDPv6
+	uint16_t type;			// 当前这个 socket 所在的状态
 	union {
 		int size;
-		uint8_t udp_address[UDP_ADDRESS_SIZE];
+		uint8_t udp_address[UDP_ADDRESS_SIZE];	// udp 情况下, 存储的是 udp 的地址信息
 	} p;
 };
 
@@ -100,7 +103,7 @@ struct socket_server {
 	int alloc_id;			// 分配的 id 计数
 	int event_n;
 	int event_index;
-	struct socket_object_interface soi;
+	struct socket_object_interface soi;	// 用户数据类型的内存操作接口
 	struct event ev[MAX_EVENT];			// 从 event poll 得到事件的集合
 	struct socket slot[MAX_SOCKET];		// 连接的 socket 集合
 	char buffer[MAX_INFO];
@@ -109,60 +112,62 @@ struct socket_server {
 };
 
 struct request_open {
-	int id;
-	int port;
+	int id;		// socket id
+	int port;	// 端口
 	uintptr_t opaque;
-	char host[1];
+	char host[1];	// 主机名或者地址(IPv4的点分十进制串或者IPv6的16进制串)的字符串起始地址
 };
 
 struct request_send {
-	int id;
-	int sz;
-	char * buffer;
+	int id;		// socket id
+	int sz;		// 发送数据大小
+	char * buffer;	// 发送数据地址
 };
 
 struct request_send_udp {
 	struct request_send send;
-	uint8_t address[UDP_ADDRESS_SIZE];
+	uint8_t address[UDP_ADDRESS_SIZE];		// udp 的地址信息
 };
 
 struct request_setudp {
-	int id;
-	uint8_t address[UDP_ADDRESS_SIZE];
+	int id;	// socket id
+	uint8_t address[UDP_ADDRESS_SIZE];		// udp 的地址信息
 };
 
 struct request_close {
-	int id;
+	int id;	// socket id
 	uintptr_t opaque;
 };
 
 struct request_listen {
-	int id;
-	int fd;
+	int id;	// socket id
+	int fd;	// socket fd
 	uintptr_t opaque;
-	char host[1];
+	char host[1];	// 主机名或者地址(IPv4的点分十进制串或者IPv6的16进制串)的字符串起始地址
 };
 
 struct request_bind {
-	int id;
-	int fd;
+	int id;	// socket id
+	int fd;	// socket fd
 	uintptr_t opaque;
 };
 
 struct request_start {
-	int id;
+	int id;	// socket id
 	uintptr_t opaque;
 };
 
 struct request_setopt {
-	int id;
-	int what;
-	int value;
+	int id;	// socket id
+
+	// setsockopt(s->fd, IPPROTO_TCP, request->what, &v, sizeof(v));
+	int what;	// 设置的选项
+	int value;	// 选项值
 };
 
 struct request_udp {
-	int id;
-	int fd;
+	int id;	// socket id
+	int fd;	// socket fd
 	int family;
 	uintptr_t opaque;
 };
@@ -203,6 +208,7 @@ struct request_package {
 	uint8_t dummy[256];
 };
 
+/// 是一个方便 sockaddr 操作的整合功能, 因为内部的成员是共享内存空间的, 这个方式有点屌!!!
 union sockaddr_all {
 	// 用于存储参与（IP）套接字通信的计算机上的一个internet协议（IP）地址。
 	// 为了统一地址结构的表示方法 ，统一接口函数，使得不同的地址结构可以被bind()、connect()、recvfrom()、sendto()等函数调用。
@@ -411,9 +417,9 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 	// 保证该 ID 不是已经标记为保留的
 	assert(s->type != SOCKET_TYPE_RESERVE);
 
-	// 释放可读数据
-	free_wb_list(ss,&s->high);
-	free_wb_list(ss,&s->low);
+	// 释放链表资源
+	free_wb_list(ss, &s->high);
+	free_wb_list(ss, &s->low);
 
 	// 用于 accpet 和 listen 的 socket 不会从 event pool 中移除
 	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
@@ -461,7 +467,7 @@ check_wb_list(struct wb_list *s) {
  * @param fd sock 的 fd
  * @param protocol sock 的协议类型
  * @param opaque 
- * @param add 是否将 fd 添加到 event pool 中
+ * @param add 是否将 fd 注册到 event pool 中
  * @return 创建成功返回 struct socket 的指针, 否则返回 NULL
  */
 static struct socket *
@@ -472,6 +478,7 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	assert(s->type == SOCKET_TYPE_RESERVE);
 
 	if (add) {
+		// 保证注册到 event pool 中
 		if (sp_add(ss->event_fd, fd, s)) {
 			s->type = SOCKET_TYPE_INVALID;
 			return NULL;
@@ -489,7 +496,8 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	return s;
 }
 
-/// 根据 request_open 提供的信息, 连接到指定的主机, 该连接产生的 sock fd 用于生成一个新的 struct socket.
+// 根据 request_open 提供的信息, 连接到指定的主机, 该连接产生的 sock fd 用于生成一个新的 struct socket.
+// 这个函数目前在我看来, 是用在与服务器各个 skynet 节点的连接.
 // return -1 when connecting
 // 当正在连接的时候返回 -1. 连接成功返回 SOCKET_OPEN, 失败返回 SOCKET_ERROR
 static int
@@ -572,7 +580,7 @@ open_socket(struct socket_server * ss, struct request_open * request, struct soc
 		goto _failed;
 	}
 
-	// 利用生成的 sock 文件描述符创建 struct socket
+	// 利用生成的 sock 文件描述符创建 struct socket, 注意这里使用的是 PROTOCOL_TCP
 	ns = new_fd(ss, id, sock, PROTOCOL_TCP, request->opaque, true);
 	if (ns == NULL) {
 		close(sock);
@@ -605,7 +613,7 @@ open_socket(struct socket_server * ss, struct request_open * request, struct soc
 		// 标记为正在连接状态
 		ns->type = SOCKET_TYPE_CONNECTING;
 
-		// 对其写状态进行侦听
+		// 对其写状态进行侦听, 等待连接完成
 		sp_write(ss->event_fd, ns->fd, ns, true);
 	}
 
@@ -620,23 +628,38 @@ _failed:
 	return SOCKET_ERROR;
 }
 
+/// 基于 tcp 协议, 使用 socket 将 wb_list 内的数据发送出去, 但是并不保证会将 wb_list 内的所有数据全部发送出去.
+/// 返回值, 返回 -1, 表示发送操作完成; SOCKET_CLOSE, 表示关闭掉了该 socket.
 static int
 send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, struct socket_message *result) {
+	
+	// 理想状态下是希望将 wb_list 内的数据全部发送出去
 	while (list->head) {
 		struct write_buffer * tmp = list->head;
 		for (;;) {
 			int sz = write(s->fd, tmp->ptr, tmp->sz);
+
 			if (sz < 0) {
 				switch(errno) {
-				case EINTR:
+
+				// 关于 EINTR 错误代码的详细解释: http://blog.csdn.net/benkaoya/article/details/17262053
+				case EINTR:		// 被信号所中断, 这只是临时性的, 再次调用可能成功, 所以下面使用 continue.
 					continue;
-				case EAGAIN:
+
+				// 关于 EAGAIN 错误代码的详细解释: http://blog.chinaunix.net/uid-20737871-id-1881207.html
+				case EAGAIN:	// 此动作会令进程阻断，但参数 s 的 socket 为不可阻断的。缓冲区已满时会报告该错误, 数据将不再发送.
 					return -1;
 				}
-				force_close(ss,s, result);
+
+				// 对于其他的错误, 将强行关闭 socket
+				force_close(ss, s, result);
 				return SOCKET_CLOSE;
 			}
+
+			// 减掉已发送数据的大小
 			s->wb_size -= sz;
+
+			// 数据并没有完全发送出去, 将已经发送的数据忽略掉, 并且停止继续发送
 			if (sz != tmp->sz) {
 				tmp->ptr += sz;
 				tmp->sz -= sz;
@@ -645,28 +668,37 @@ send_list_tcp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			break;
 		}
 		list->head = tmp->next;
-		write_buffer_free(ss,tmp);
+		write_buffer_free(ss, tmp);
 	}
 	list->tail = NULL;
 
 	return -1;
 }
 
+/// 将 udp_address 的数据给 sockaddr_all, 返回数据, 操作协议对应结构体的大小. 若没有对应的协议, 返回 0.
 static socklen_t
 udp_socket_address(struct socket *s, const uint8_t udp_address[UDP_ADDRESS_SIZE], union sockaddr_all *sa) {
+	// 类型判断, 保证与 socket 的协议类型相同
 	int type = (uint8_t)udp_address[0];
 	if (type != s->protocol)
 		return 0;
+
+	// 拿到端口数据
 	uint16_t port = 0;
 	memcpy(&port, udp_address+1, sizeof(uint16_t));
+
 	switch (s->protocol) {
 	case PROTOCOL_UDP:
+
+		// 拿到 IPv4 的地址数据
 		memset(&sa->v4, 0, sizeof(sa->v4));
 		sa->s.sa_family = AF_INET;
 		sa->v4.sin_port = port;
 		memcpy(&sa->v4.sin_addr, udp_address + 1 + sizeof(uint16_t), sizeof(sa->v4.sin_addr));	// ipv4 address is 32 bits
 		return sizeof(sa->v4);
 	case PROTOCOL_UDPv6:
+
+		// 拿到 IPv6 的地址数据
 		memset(&sa->v6, 0, sizeof(sa->v6));
 		sa->s.sa_family = AF_INET6;
 		sa->v6.sin6_port = port;
@@ -676,13 +708,25 @@ udp_socket_address(struct socket *s, const uint8_t udp_address[UDP_ADDRESS_SIZE]
 	return 0;
 }
 
+/// 基于 udp 协议, 使用 socket 将 wb_list 的数据发送出去, 但是并不保证会将 wb_list 内的所有数据全部发送出去.
+/// 函数始终返回 -1
 static int
 send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, struct socket_message *result) {
+
+	// 理想状态下是希望将 wb_list 数据全部发送出去
 	while (list->head) {
 		struct write_buffer * tmp = list->head;
+
+		// 获得地址数据
 		union sockaddr_all sa;
 		socklen_t sasz = udp_socket_address(s, tmp->udp_address, &sa);
+
+		// int sendto(socket s, const void * msg, int len, unsigned int flags, const struct sockaddr * to, int tolen);
+		// 指向一指定目的地发送数据，适用于发送未建立连接的 UDP 数据报.
+		// 成功则返回实际传送出去的字符数，失败返回－1，错误原因存于errno 中。
 		int err = sendto(s->fd, tmp->ptr, tmp->sz, 0, &sa.s, sasz);
+
+		// 只要产生错误, 那么将停止发送
 		if (err < 0) {
 			switch(errno) {
 			case EINTR:
@@ -692,6 +736,7 @@ send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 			fprintf(stderr, "socket-server : udp (%d) sendto error %s.\n",s->id, strerror(errno));
 			return -1;
 /*			// ignore udp sendto error
+			忽略 udp sendto 函数的错误
 			
 			result->opaque = s->opaque;
 			result->id = s->id;
@@ -711,6 +756,7 @@ send_list_udp(struct socket_server *ss, struct socket *s, struct wb_list *list, 
 	return -1;
 }
 
+/// 根据 socket.protocol 协议类型选择将 wb_list 数据发送出去的方式
 static int
 send_list(struct socket_server *ss, struct socket *s, struct wb_list *list, struct socket_message *result) {
 	if (s->protocol == PROTOCOL_TCP) {
@@ -720,17 +766,22 @@ send_list(struct socket_server *ss, struct socket *s, struct wb_list *list, stru
 	}
 }
 
+/// 判断 wb_list 链表是否完成发送
 static inline int
 list_uncomplete(struct wb_list *s) {
 	struct write_buffer *wb = s->head;
 	if (wb == NULL)
 		return 0;
 	
+	// 如果 ptr 和 buffer 不相同, 表示当前正在操作
 	return (void *)wb->ptr != wb->buffer;
 }
 
+/// 
 static void
 raise_uncomplete(struct socket * s) {
+
+	// 将 low 的链表的第二个元素作为 low 的头
 	struct wb_list *low = &s->low;
 	struct write_buffer *tmp = low->head;
 	low->head = tmp->next;
@@ -739,7 +790,10 @@ raise_uncomplete(struct socket * s) {
 	}
 
 	// move head of low list (tmp) to the empty high list
+	// 将之前 low 链表的头移动到空的 high 链表
 	struct wb_list *high = &s->high;
+
+	// 保证 high 链表必须为空
 	assert(high->head == NULL);
 
 	tmp->next = NULL;
@@ -748,30 +802,46 @@ raise_uncomplete(struct socket * s) {
 
 /*
 	Each socket has two write buffer list, high priority and low priority.
+	每个 socket 拥有两个写缓存链表, 高优先级的和低优先级的.
 
 	1. send high list as far as possible.
 	2. If high list is empty, try to send low list.
 	3. If low list head is uncomplete (send a part before), move the head of low list to empty high list (call raise_uncomplete) .
-	4. If two lists are both empty, turn off the event. (call check_close)
+	4. If two lists are both empty, turn off the event. 
+
+	1. 尽可能的发送高优先级的链表数据.
+	2. 如果高优先级链表为空, 那么尝试发送低优先级链表数据.
+	3. 如果低优先级的链表未完全发送数据(只发送了部分数据), 将低优先级链表的头移动到空的高优先级链表中(调用 raise_uncomplete).
+	4. 如果两个链表都是空的, 关闭事件. 
  */
+/// 将 socket 的 high 和 low 链表内的数据发送出去
+/// 返回值, 发送成功返回 -1, 否则返回 SOCKET_CLOSE
 static int
 send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *result) {
+
+	// 必须保证低优先级的链表数据之前已经完全发送成功
 	assert(!list_uncomplete(&s->low));
+
 	// step 1
-	if (send_list(ss,s,&s->high,result) == SOCKET_CLOSE) {
+	if (send_list(ss, s, &s->high, result) == SOCKET_CLOSE) {
 		return SOCKET_CLOSE;
 	}
+
+	// 必须先将高优先级链表的数据发送完
 	if (s->high.head == NULL) {
+		
 		// step 2
 		if (s->low.head != NULL) {
-			if (send_list(ss,s,&s->low,result) == SOCKET_CLOSE) {
+			if (send_list(ss, s, &s->low, result) == SOCKET_CLOSE) {
 				return SOCKET_CLOSE;
 			}
+
 			// step 3
 			if (list_uncomplete(&s->low)) {
 				raise_uncomplete(s);
 			}
 		} else {
+
 			// step 4
 			sp_write(ss->event_fd, s->fd, s, false);
 
@@ -785,15 +855,29 @@ send_buffer(struct socket_server *ss, struct socket *s, struct socket_message *r
 	return -1;
 }
 
+/**
+ * 将 request_send 的发送数据转化为 write_buffer 添加到 wb_list 链表中
+ * @param ss socket_server
+ * @param s 添加数据的的 wb_list
+ * @param request 数据来源
+ * @param size 分配的内存大小, 分配给 write_buffer 的内存大小会因为 tcp 和 udp 协议不同而不同
+ * @param n write_buffer ptr 指针相对 buffer 指针的偏移量
+ * @return 生成的 write_buffer
+ */
 static struct write_buffer *
 append_sendbuffer_(struct socket_server *ss, struct wb_list *s, struct request_send * request, int size, int n) {
+	// 分配内存资源
 	struct write_buffer * buf = MALLOC(size);
+
+	// 初始化 write_buffer
 	struct send_object so;
 	buf->userobject = send_object_init(ss, &so, request->buffer, request->sz);
-	buf->ptr = (char*)so.buffer+n;
-	buf->sz = so.sz - n;
-	buf->buffer = request->buffer;
+	buf->ptr = (char *)so.buffer + n;	// 计算发送数据的偏移量
+	buf->sz = so.sz - n;	// 计算剩余发送数据的大小
+	buf->buffer = request->buffer;	// 保存发送数据的起始地址
 	buf->next = NULL;
+
+	// 将 write_buffer 添加到 wb_list 中
 	if (s->head == NULL) {
 		s->head = s->tail = buf;
 	} else {
@@ -805,26 +889,32 @@ append_sendbuffer_(struct socket_server *ss, struct wb_list *s, struct request_s
 	return buf;
 }
 
+/// 基于 udp 协议, 将 request_send 的数据添加到 socket 的写队列中
 static inline void
 append_sendbuffer_udp(struct socket_server *ss, struct socket *s, int priority, struct request_send * request, const uint8_t udp_address[UDP_ADDRESS_SIZE]) {
 	struct wb_list *wl = (priority == PRIORITY_HIGH) ? &s->high : &s->low;
 	struct write_buffer *buf = append_sendbuffer_(ss, wl, request, SIZEOF_UDPBUFFER, 0);
+
+	// write_buffer 会对 udp_address 的内容进行复制, 复制到自己的 udp_address 中
 	memcpy(buf->udp_address, udp_address, UDP_ADDRESS_SIZE);
 	s->wb_size += buf->sz;
 }
 
+/// 基于 tcp 协议, 将 request_send 的数据添加到 socket 的 high 写队列中
 static inline void
 append_sendbuffer(struct socket_server *ss, struct socket *s, struct request_send * request, int n) {
 	struct write_buffer *buf = append_sendbuffer_(ss, &s->high, request, SIZEOF_TCPBUFFER, n);
 	s->wb_size += buf->sz;
 }
 
+/// 基于 tcp 协议, 将 request_send 的数据添加到 socket 的 low 写队列中
 static inline void
 append_sendbuffer_low(struct socket_server *ss,struct socket *s, struct request_send * request) {
 	struct write_buffer *buf = append_sendbuffer_(ss, &s->low, request, SIZEOF_TCPBUFFER, 0);
 	s->wb_size += buf->sz;
 }
 
+/// 判断当前 socket 的待发送队列(high 和 low)是否为空
 static inline int
 send_buffer_empty(struct socket *s) {
 	return (s->high.head == NULL && s->low.head == NULL);
@@ -832,11 +922,17 @@ send_buffer_empty(struct socket *s) {
 
 /*
 	When send a package , we can assign the priority : PRIORITY_HIGH or PRIORITY_LOW
+	当一个数据包发送的时候, 我们可以指派优先级: PRIORITY_HIGH 或者 PRIORITY_LOW
 
 	If socket buffer is empty, write to fd directly.
 		If write a part, append the rest part to high list. (Even priority is PRIORITY_LOW)
 	Else append package to high (PRIORITY_HIGH) or low (PRIORITY_LOW) list.
+
+	如果 socket 写队列为空, 那么直接使用文件描述符(fd)调用 write 方法
+		如果写入数据只操作了一部分, 那么将剩余的数据添加到 high 链表中. (即使 priority 参数的优先级是 PRIORITY_LOW)
+	否则会把数据包添加到高优先级队列(PRIORITY_HIGH)或者低优先级队列(PRIORITY_LOW)中.
  */
+/// 将 request_send 的数据发送出去. 返回值, 发送成功返回 -1, 否则返回 SOCKET_CLOSE
 static int
 send_socket(struct socket_server *ss, struct request_send * request, struct socket_message *result, int priority, const uint8_t *udp_address) {
 	int id = request->id;
@@ -846,35 +942,47 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id 
 		|| s->type == SOCKET_TYPE_HALFCLOSE
 		|| s->type == SOCKET_TYPE_PACCEPT) {
+
+		// 看到这里我理解了好几种意思:
+		// socket_object_interface.buffer 接口不应该分配新的内存空间
+		// socket_object_interface.free_func 能够释放掉分配的内存空间
 		so.free_func(request->buffer);
 		return -1;
 	}
+
 	if (s->type == SOCKET_TYPE_PLISTEN || s->type == SOCKET_TYPE_LISTEN) {
 		fprintf(stderr, "socket-server: write to listen fd %d.\n", id);
 		so.free_func(request->buffer);
 		return -1;
 	}
+
 	if (send_buffer_empty(s) && s->type == SOCKET_TYPE_CONNECTED) {
 		if (s->protocol == PROTOCOL_TCP) {
+			// tcp
 			int n = write(s->fd, so.buffer, so.sz);
-			if (n<0) {
+			if (n < 0) {
 				switch(errno) {
 				case EINTR:
 				case EAGAIN:
 					n = 0;
 					break;
 				default:
-					fprintf(stderr, "socket-server: write to %d (fd=%d) error :%s.\n",id,s->fd,strerror(errno));
-					force_close(ss,s,result);
+					fprintf(stderr, "socket-server: write to %d (fd=%d) error :%s.\n", id, s->fd, strerror(errno));
+					force_close(ss, s, result);
 					so.free_func(request->buffer);
 					return SOCKET_CLOSE;
 				}
 			}
+
+			// 如果数据已经完全写入到发送缓存中
 			if (n == so.sz) {
 				so.free_func(request->buffer);
 				return -1;
 			}
-			append_sendbuffer(ss, s, request, n);	// add to high priority list, even priority == PRIORITY_LOW
+
+			// add to high priority list, even priority == PRIORITY_LOW
+			// 添加到高优先级链表, 即使 priority == PRIORITY_LOW
+			append_sendbuffer(ss, s, request, n);
 		} else {
 			// udp
 			if (udp_address == NULL) {
@@ -884,14 +992,19 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			socklen_t sasz = udp_socket_address(s, udp_address, &sa);
 			int n = sendto(s->fd, so.buffer, so.sz, 0, &sa.s, sasz);
 			if (n != so.sz) {
-				append_sendbuffer_udp(ss,s,priority,request,udp_address);
+				append_sendbuffer_udp(ss, s, priority, request, udp_address);
 			} else {
 				so.free_func(request->buffer);
 				return -1;
 			}
 		}
+
+		// 达到这里表示还需要继续写数据, 所以开启可写事件侦听
 		sp_write(ss->event_fd, s->fd, s, true);
+
 	} else {
+		// 链表非空情况下的逻辑处理
+
 		if (s->protocol == PROTOCOL_TCP) {
 			if (priority == PRIORITY_LOW) {
 				append_sendbuffer_low(ss, s, request);
@@ -902,14 +1015,15 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			if (udp_address == NULL) {
 				udp_address = s->p.udp_address;
 			}
-			append_sendbuffer_udp(ss,s,priority,request,udp_address);
+			append_sendbuffer_udp(ss, s, priority, request, udp_address);
 		}
 	}
 	return -1;
 }
 
+/// 根据 request_listen 生成新的 socket, 并且将 type 标记为 SOCKET_TYPE_PLISTEN. 成功返回 -1, 否则返回 SOCKET_ERROR
 static int
-listen_socket(struct socket_server *ss, struct request_listen * request, struct socket_message *result) {
+listen_socket(struct socket_server * ss, struct request_listen * request, struct socket_message * result) {
 	int id = request->id;
 	int listen_fd = request->fd;
 	struct socket *s = new_fd(ss, id, listen_fd, PROTOCOL_TCP, request->opaque, false);
@@ -918,6 +1032,7 @@ listen_socket(struct socket_server *ss, struct request_listen * request, struct 
 	}
 	s->type = SOCKET_TYPE_PLISTEN;
 	return -1;
+
 _failed:
 	close(listen_fd);
 	result->opaque = request->opaque;
@@ -929,10 +1044,14 @@ _failed:
 	return SOCKET_ERROR;
 }
 
+/// 根据 request_close 关闭 socket.
+/// 返回值, 如果查询到的 socket 不符合要求, 返回 SOCKET_CLOSE; 如果
 static int
 close_socket(struct socket_server *ss, struct request_close *request, struct socket_message *result) {
 	int id = request->id;
 	struct socket * s = &ss->slot[HASH_ID(id)];
+
+	// 不符合条件直接返回
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id) {
 		result->id = id;
 		result->opaque = request->opaque;
@@ -940,22 +1059,31 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		result->data = NULL;
 		return SOCKET_CLOSE;
 	}
+
+	// 如果发送链表中还有数据, 需要将数据全部发出
 	if (!send_buffer_empty(s)) { 
-		int type = send_buffer(ss,s,result);
+		int type = send_buffer(ss, s, result);
+
+		// 如果出错, 
 		if (type != -1)
 			return type;
 	}
+
+	// 如果发送链表为空了, 那么释放 socket 的资源
 	if (send_buffer_empty(s)) {
-		force_close(ss,s,result);
+		force_close(ss, s, result);
 		result->id = id;
 		result->opaque = request->opaque;
 		return SOCKET_CLOSE;
 	}
+
+	// 如果还有链表不为空, 那么将 socket 标记为半关闭状态
 	s->type = SOCKET_TYPE_HALFCLOSE;
 
 	return -1;
 }
 
+/// 根据 request_bind 生成 socket, 返回值, 成功返回 SOCKET_OPEN, 失败返回 SOCKET_ERROR.
 static int
 bind_socket(struct socket_server *ss, struct request_bind *request, struct socket_message *result) {
 	int id = request->id;
@@ -967,12 +1095,17 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 		result->data = NULL;
 		return SOCKET_ERROR;
 	}
+
+	// 设置 sock 为非阻塞
 	sp_nonblocking(request->fd);
+
+	// 标记为 bind
 	s->type = SOCKET_TYPE_BIND;
 	result->data = "binding";
 	return SOCKET_OPEN;
 }
 
+/// 
 static int
 start_socket(struct socket_server *ss, struct request_start *request, struct socket_message *result) {
 	int id = request->id;
@@ -981,7 +1114,7 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	result->ud = 0;
 	result->data = NULL;
 	struct socket *s = &ss->slot[HASH_ID(id)];
-	if (s->type == SOCKET_TYPE_INVALID || s->id !=id) {
+	if (s->type == SOCKET_TYPE_INVALID || s->id != id) {
 		return SOCKET_ERROR;
 	}
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {

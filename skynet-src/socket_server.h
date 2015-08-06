@@ -67,9 +67,9 @@ const struct socket_udp_address * socket_server_udp_address(struct socket_server
 
 // socket 对象的操作接口
 struct socket_object_interface {
-	void * (*buffer)(void *);      // 获得发送数据起始地址函数接口
+	void * (*buffer)(void *);      // 获得发送数据起始地址函数接口, 读了 send_socket 这个函数, 实现 buffer 接口的函数不应该分配新的内存空间, 否则会发生内存泄漏
 	int (*size)(void *);           // 获得发送数据大小的函数接口
-	void (*free)(void *);          // 释放数据资源的函数接口
+	void (*free)(void *);          // 释放数据资源的函数接口, 保证能够释放掉已经分配的内存空间
 };
 
 // if you send package sz == -1, use soi.
