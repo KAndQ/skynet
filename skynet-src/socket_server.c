@@ -105,7 +105,7 @@ struct socket_server {
 	struct socket slot[MAX_SOCKET];		// 连接的 socket 集合
 	char buffer[MAX_INFO];
 	uint8_t udpbuffer[MAX_UDP_PACKAGE];
-	fd_set rfds;
+	fd_set rfds;						// select 函数中判断是否有可读字符集
 };
 
 struct request_open {
@@ -288,7 +288,7 @@ socket_keepalive(int fd) {
 	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&keepalive , sizeof(keepalive));
 }
 
-/// 当 socket 的 type 是 INVALID 的时候, 获得该 id. 如果没有可用的 id, 返回 -1
+/// 当 socket 的 type 是 INVALID 的时候, 将该 socket.type 设置为 SOCKET_TYPE_RESERVE, 并返回该 id. 如果没有可用的 id, 返回 -1
 static int
 reserve_id(struct socket_server *ss) {
 	int i;
@@ -365,7 +365,7 @@ socket_server_create() {
 	ss->sendctrl_fd = fd[1];
 	ss->checkctrl = 1;
 	FD_ZERO(&ss->rfds);
-	assert(ss->recvctrl_fd < FD_SETSIZE);
+	assert(ss->recvctrl_fd < FD_SETSIZE);	// 保证文件描述符没有超过 FD_SETSIZE 大小, 
 
 	// struct socket 初始化
 	for (i=0;i<MAX_SOCKET;i++) {
@@ -384,6 +384,7 @@ socket_server_create() {
 	return ss;
 }
 
+/// 释放 wb_list 中元素的资源, 并且将 wb_list 设置为空链表.
 static void
 free_wb_list(struct socket_server *ss, struct wb_list *list) {
 	struct write_buffer *wb = list->head;
@@ -396,6 +397,7 @@ free_wb_list(struct socket_server *ss, struct wb_list *list) {
 	list->tail = NULL;
 }
 
+/// 强行关闭 socket, 清除其资源
 static void
 force_close(struct socket_server *ss, struct socket *s, struct socket_message *result) {
 	result->id = s->id;
@@ -405,20 +407,32 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 	if (s->type == SOCKET_TYPE_INVALID) {
 		return;
 	}
+
+	// 保证该 ID 不是已经标记为保留的
 	assert(s->type != SOCKET_TYPE_RESERVE);
+
+	// 释放可读数据
 	free_wb_list(ss,&s->high);
 	free_wb_list(ss,&s->low);
+
+	// 用于 accpet 和 listen 的 socket 不会从 event pool 中移除
 	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
 		sp_del(ss->event_fd, s->fd);
 	}
+
+	// 用于 bind 的 socket 不会被 close
 	if (s->type != SOCKET_TYPE_BIND) {
 		close(s->fd);
 	}
+
+	// 标记 socket 是无效的
 	s->type = SOCKET_TYPE_INVALID;
 }
 
 void 
 socket_server_release(struct socket_server *ss) {
+
+	// 释放掉所有的 socket 资源
 	int i;
 	struct socket_message dummy;
 	for (i=0;i<MAX_SOCKET;i++) {
@@ -433,15 +447,28 @@ socket_server_release(struct socket_server *ss) {
 	FREE(ss);
 }
 
+/// 检查 wb_list 必须是空的链表
 static inline void
 check_wb_list(struct wb_list *s) {
 	assert(s->head == NULL);
 	assert(s->tail == NULL);
 }
 
+/**
+ * 创建新的 socket
+ * @param ss socket_server
+ * @param id 在 socket_server 中可使用的 id
+ * @param fd sock 的 fd
+ * @param protocol sock 的协议类型
+ * @param opaque 
+ * @param add 是否将 fd 添加到 event pool 中
+ * @return 创建成功返回 struct socket 的指针, 否则返回 NULL
+ */
 static struct socket *
 new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque, bool add) {
 	struct socket * s = &ss->slot[HASH_ID(id)];
+
+	// id 对应的 socket 必须是已经保留的
 	assert(s->type == SOCKET_TYPE_RESERVE);
 
 	if (add) {
@@ -462,44 +489,82 @@ new_fd(struct socket_server *ss, int id, int fd, int protocol, uintptr_t opaque,
 	return s;
 }
 
+/// 根据 request_open 提供的信息, 连接到指定的主机, 该连接产生的 sock fd 用于生成一个新的 struct socket.
 // return -1 when connecting
+// 当正在连接的时候返回 -1. 连接成功返回 SOCKET_OPEN, 失败返回 SOCKET_ERROR
 static int
-open_socket(struct socket_server *ss, struct request_open * request, struct socket_message *result) {
+open_socket(struct socket_server * ss, struct request_open * request, struct socket_message * result) {
 	int id = request->id;
 	result->opaque = request->opaque;
 	result->id = id;
 	result->ud = 0;
 	result->data = NULL;
+
 	struct socket *ns;
 	int status;
+
+	/*
+	typedef struct addrinfo {
+	    int ai_flags;			// AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST
+	    int ai_family;			// AF_INET, AF_INET6
+	    int ai_socktype;		// SOCK_STREAM, SOCK_DGRAM
+	    int ai_protocol;		// IPPROTO_IP, IPPROTO_IPV4, IPPROTO_IPV6, IPPROTO_UDP, IPPROTO_TCP
+	    size_t ai_addrlen;		// must be zero or a null pointer
+	    char* ai_canonname;		// must be zero or a null pointer
+	    struct sockaddr* ai_addr;	// must be zero or a null pointer
+	    struct addrinfo* ai_next;	// must be zero or a null pointer
+	}
+	*/
 	struct addrinfo ai_hints;
 	struct addrinfo *ai_list = NULL;
 	struct addrinfo *ai_ptr = NULL;
+	
+	// 获得端口号
 	char port[16];
 	sprintf(port, "%d", request->port);
-	memset(&ai_hints, 0, sizeof( ai_hints ) );
+	memset(&ai_hints, 0, sizeof(ai_hints));
+
 	ai_hints.ai_family = AF_UNSPEC;
 	ai_hints.ai_socktype = SOCK_STREAM;
 	ai_hints.ai_protocol = IPPROTO_TCP;
 
-	status = getaddrinfo( request->host, port, &ai_hints, &ai_list );
-	if ( status != 0 ) {
+	// int getaddrinfo(const char *hostname, const char *service, const struct addrinfo *hints, struct addrinfo **result);
+	// hostname:一个主机名或者地址串(IPv4的点分十进制串或者IPv6的16进制串)
+	// service：服务名可以是十进制的端口号，也可以是已定义的服务名称，如ftp、http等
+	// hints：可以是一个空指针，也可以是一个指向某个addrinfo结构体的指针，调用者在这个结构中填入关于期望返回的信息类型的暗示。
+	// result：本函数通过result指针参数返回一个指向addrinfo结构体链表的指针。
+	// 返回值: 0 成功, 非 0 出错
+	status = getaddrinfo(request->host, port, &ai_hints, &ai_list);
+	if (status != 0) {
 		goto _failed;
 	}
-	int sock= -1;
-	for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next ) {
-		sock = socket( ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol );
-		if ( sock < 0 ) {
+
+	int sock = -1;
+	for (ai_ptr = ai_list; ai_ptr != NULL; ai_ptr = ai_ptr->ai_next) {
+		// int socket(int domain, int type, int protocol);
+		// 返回值: 若成功, 返回文件(套接字)描述符; 若出错, 返回 -1
+		sock = socket(ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol);
+		if (sock < 0) {
 			continue;
 		}
+
+		// 开启 keepalive 功能
 		socket_keepalive(sock);
+
+		// 设置当前 sock 非阻塞
 		sp_nonblocking(sock);
-		status = connect( sock, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-		if ( status != 0 && errno != EINPROGRESS) {
+
+		// 将 sock 连接到指定的服务器
+		// int connect(int sockfd, const struct sockaddr * addr, socklen_t len);
+		// 返回值: 若成功, 返回 0, 若出错, 返回 -1
+		status = connect(sock, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+		if (status != 0 && errno != EINPROGRESS) {
 			close(sock);
 			sock = -1;
 			continue;
 		}
+
+		// 只要有一个 sock 连接成功则跳出循环
 		break;
 	}
 
@@ -507,30 +572,50 @@ open_socket(struct socket_server *ss, struct request_open * request, struct sock
 		goto _failed;
 	}
 
+	// 利用生成的 sock 文件描述符创建 struct socket
 	ns = new_fd(ss, id, sock, PROTOCOL_TCP, request->opaque, true);
 	if (ns == NULL) {
 		close(sock);
 		goto _failed;
 	}
 
+	// 连接 request_open 的主机成功
 	if(status == 0) {
+		// 标记为连接主机成功
 		ns->type = SOCKET_TYPE_CONNECTED;
+
+		// 获得主机的 struct sockaddr 数据
 		struct sockaddr * addr = ai_ptr->ai_addr;
 		void * sin_addr = (ai_ptr->ai_family == AF_INET) ? (void*)&((struct sockaddr_in *)addr)->sin_addr : (void*)&((struct sockaddr_in6 *)addr)->sin6_addr;
+
+		// const char * inet_ntop(int af, const void *src, char *dst, socklen_t cnt);
+		// 将 src(二进制数据) 转化为 dst(字符串, 格式为 192.168.1.1)
+
+		// int inet_pton(int af, const char *src, void *dst);
+		// 将 src(字符串数据, 格式为 192.168.1.1) 转化为 dst(二进制数据)
 		if (inet_ntop(ai_ptr->ai_family, sin_addr, ss->buffer, sizeof(ss->buffer))) {
 			result->data = ss->buffer;
 		}
-		freeaddrinfo( ai_list );
+
+		freeaddrinfo(ai_list);
 		return SOCKET_OPEN;
+
+	// 连接 request_open 的主机未成功
 	} else {
+		// 标记为正在连接状态
 		ns->type = SOCKET_TYPE_CONNECTING;
+
+		// 对其写状态进行侦听
 		sp_write(ss->event_fd, ns->fd, ns, true);
 	}
 
-	freeaddrinfo( ai_list );
+	freeaddrinfo(ai_list);
 	return -1;
+
 _failed:
-	freeaddrinfo( ai_list );
+	freeaddrinfo(ai_list);
+
+	// 如果失败, 标记该 id 是无效的
 	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 	return SOCKET_ERROR;
 }

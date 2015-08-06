@@ -18,7 +18,7 @@
 struct socket_server;
 
 struct socket_message {
-	int id;
+	int id;            // socket 对象的 id
 	uintptr_t opaque;
 
     // for accept, ud is listen id; for data, ud is size of data.
@@ -29,7 +29,11 @@ struct socket_message {
 
 /// 创建 socket_server 对象
 struct socket_server * socket_server_create();
+
+/// 释放 socket_server 对象资源
 void socket_server_release(struct socket_server *);
+
+/// 
 int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);
 
 void socket_server_exit(struct socket_server *);
