@@ -9,9 +9,9 @@
 
 #define SOCKET_DATA 0       // tcp 协议, 接收数据成功时的返回值
 #define SOCKET_CLOSE 1      // socket 已经关闭
-#define SOCKET_OPEN 2
-#define SOCKET_ACCEPT 3
-#define SOCKET_ERROR 4      // socket 操作产生错误
+#define SOCKET_OPEN 2       // 当前的 socket 可操作
+#define SOCKET_ACCEPT 3     // 接入新的 socket 连接
+#define SOCKET_ERROR 4      // socket 操作产生错误, 这时的 socket 是无法操作的
 #define SOCKET_EXIT 5       // 当前 skynet 节点退出通信的轮询
 #define SOCKET_UDP 6        // udp 协议, 接收数据成功时的返回值
 
@@ -50,7 +50,7 @@ void socket_server_exit(struct socket_server *);
 /// 请求关闭指定的 socket
 void socket_server_close(struct socket_server *, uintptr_t opaque, int id);
 
-
+/// 请求打开一个可操作的 socket
 void socket_server_start(struct socket_server *, uintptr_t opaque, int id);
 
 // return -1 when error

@@ -22,6 +22,25 @@
 #define MIN_READ_BUFFER 64		// 初始化 socket 读取数据的最小字节数
 
 // socket 的状态
+/*
+状态切换的分析:
+
+- invalid 状态的才能被 reserve;
+
+- 处于 invalid 状态的 socket 基本不能做任何的操作, 除了等着被 reserve;
+
+- 在创建侦听 socket 的时候, 状态变为 plisten, 通过调用 start_socket 方法状态改变为 listen, 这时才能获得连接的客户端;
+
+- 在接收到新的客户端连接时, 连接的客户端 socket 状态首先是 paccept, 通过调用 start_socket 方法状态改变为 connected, 这时才能接收/发送数据;
+
+- 在与其他主机连接的时候, 如果直接连接成功则状态直接设置为 connected, 否则设置为 connecting, 侦听事件通知, 如果对应的 socket 有读/写事件, 那么马上设置状态为 connected
+
+- 如果不是主动关闭 socket, 例如是客户端关闭 socket, 那么这时 socket 的状态是 invalid; 如果是主动关闭 socket, 
+那么会首先将状态设置为 halfclose, 这个状态会保证先将数据全部发送出去再关闭, 但是在这个状态的 socket 将忽略掉接收的数据, 
+也不再发送 close 之后的数据, 只是保证把 close 之前的数据发送出去.
+
+- bind 状态比较特殊, 使用 bind_socket(socket_server_bind) 直接设置状态为 bind 状态
+*/
 #define SOCKET_TYPE_INVALID 0		// 为使用的 socket 标记, 只有 socket 在这个状态才能被 reserve
 #define SOCKET_TYPE_RESERVE 1		// 表示当前 socket 已经有人预约了, 在这个状态的 socket 才能 new_fd(生成 socket)
 #define SOCKET_TYPE_PLISTEN 2		// 正在侦听客户端发起的连接, 但是还没有被 start_socket 调用, 这时还无法接收客户端的连接
@@ -428,7 +447,7 @@ force_close(struct socket_server *ss, struct socket *s, struct socket_message *r
 	free_wb_list(ss, &s->high);
 	free_wb_list(ss, &s->low);
 
-	// 用于 accpet 和 listen 的 socket 不会从 event pool 中移除
+	// 用于 accpet 和 listen 的 socket 不会从 event pool 中移除, 因为这时并还没有将 fd 添加到 event pool 中
 	if (s->type != SOCKET_TYPE_PACCEPT && s->type != SOCKET_TYPE_PLISTEN) {
 		sp_del(ss->event_fd, s->fd);
 	}
@@ -957,6 +976,7 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 		return -1;
 	}
 
+	// 侦听状态的 socket 是不能传输数据的
 	if (s->type == SOCKET_TYPE_PLISTEN || s->type == SOCKET_TYPE_LISTEN) {
 		fprintf(stderr, "socket-server: write to listen fd %d.\n", id);
 		so.free_func(request->buffer);
