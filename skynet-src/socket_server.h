@@ -17,8 +17,9 @@
 
 struct socket_server;
 
+/// 主要用于在操作 socket 时, 存储的操作 socket 的相关信息
 struct socket_message {
-	int id;            // socket 对象的 id
+	int id;            // socket id
 	uintptr_t opaque;
 
     // for accept, ud is listen id; for data, ud is size of data.
@@ -73,7 +74,8 @@ struct socket_object_interface {
 };
 
 // if you send package sz == -1, use soi.
-// 如果发送数据包的 sz 参数为 -1 时, 使用 soi. 该函数对参数 soi 指向的数值进行了复制.
+// 如果发送数据包的 sz 参数为 -1 时, 使用 soi.
+// 设置 socket_server.soi
 void socket_server_userobject(struct socket_server *, struct socket_object_interface *soi);
 
 #endif
