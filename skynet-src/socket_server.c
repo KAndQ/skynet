@@ -2070,36 +2070,46 @@ socket_server_udp(struct socket_server *ss, uintptr_t opaque, const char * addr,
 			return -1;
 		}
 	}
+
+	// 设置非阻塞模式
 	sp_nonblocking(fd);
 
+	// 申请 socket id
 	int id = reserve_id(ss);
 	if (id < 0) {
 		close(fd);
 		return -1;
 	}
+
+	// 生成 request_udp
 	struct request_package request;
 	request.u.udp.id = id;
 	request.u.udp.fd = fd;
 	request.u.udp.opaque = opaque;
 	request.u.udp.family = family;
 
+	// 将 request_udp 写入管道
 	send_request(ss, &request, 'U', sizeof(request.u.udp));	
 	return id;
 }
 
 int64_t 
 socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp_address *addr, const void *buffer, int sz) {
+
+	// 有效性校验
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		free_buffer(ss, buffer, sz);
 		return -1;
 	}
 
+	// 生成 request_send_udp
 	struct request_package request;
 	request.u.send_udp.send.id = id;
 	request.u.send_udp.send.sz = sz;
 	request.u.send_udp.send.buffer = (char *)buffer;
 
+	// 复制地址信息
 	const uint8_t *udp_address = (const uint8_t *)addr;
 	int addrsz;
 	switch (udp_address[0]) {
@@ -2113,9 +2123,9 @@ socket_server_udp_send(struct socket_server *ss, int id, const struct socket_udp
 		free_buffer(ss, buffer, sz);
 		return -1;
 	}
-
 	memcpy(request.u.send_udp.address, udp_address, addrsz);	
 
+	// 将 request_send_udp 写入管道
 	send_request(ss, &request, 'A', sizeof(request.u.send_udp.send)+addrsz);
 	return s->wb_size;
 }
@@ -2126,16 +2136,19 @@ socket_server_udp_connect(struct socket_server *ss, int id, const char * addr, i
 	struct addrinfo ai_hints;
 	struct addrinfo *ai_list = NULL;
 	char portstr[16];
+
+	// 拿到目标的地址信息
 	sprintf(portstr, "%d", port);
 	memset( &ai_hints, 0, sizeof( ai_hints ) );
 	ai_hints.ai_family = AF_UNSPEC;
 	ai_hints.ai_socktype = SOCK_DGRAM;
 	ai_hints.ai_protocol = IPPROTO_UDP;
-
 	status = getaddrinfo(addr, portstr, &ai_hints, &ai_list );
 	if ( status != 0 ) {
 		return -1;
 	}
+
+	// 生成 request_setudp
 	struct request_package request;
 	request.u.set_udp.id = id;
 	int protocol;
@@ -2153,13 +2166,15 @@ socket_server_udp_connect(struct socket_server *ss, int id, const char * addr, i
 
 	freeaddrinfo( ai_list );
 
-	send_request(ss, &request, 'C', sizeof(request.u.set_udp) - sizeof(request.u.set_udp.address) +addrsz);
+	// 将 request_setudp 写入管道
+	send_request(ss, &request, 'C', sizeof(request.u.set_udp) - sizeof(request.u.set_udp.address) + addrsz);
 
 	return 0;
 }
 
 const struct socket_udp_address *
 socket_server_udp_address(struct socket_server *ss, struct socket_message *msg, int *addrsz) {
+	// 这里参考 forward_message_udp 函数, data + n 存储地址信息, data 存储数据内容
 	uint8_t * address = (uint8_t *)(msg->data + msg->ud);
 	int type = address[0];
 	switch(type) {
