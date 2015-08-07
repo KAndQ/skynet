@@ -7,13 +7,13 @@
 
 #include <stdint.h>
 
-#define SOCKET_DATA 0
-#define SOCKET_CLOSE 1
+#define SOCKET_DATA 0       // tcp 协议, 接收数据成功时的返回值
+#define SOCKET_CLOSE 1      // socket 已经关闭
 #define SOCKET_OPEN 2
 #define SOCKET_ACCEPT 3
-#define SOCKET_ERROR 4
-#define SOCKET_EXIT 5
-#define SOCKET_UDP 6
+#define SOCKET_ERROR 4      // socket 操作产生错误
+#define SOCKET_EXIT 5       // 当前 skynet 节点退出通信的轮询
+#define SOCKET_UDP 6        // udp 协议, 接收数据成功时的返回值
 
 struct socket_server;
 
@@ -34,20 +34,44 @@ struct socket_server * socket_server_create();
 /// 释放 socket_server 对象资源
 void socket_server_release(struct socket_server *);
 
-/// 
+/**
+ * 轮询的方式从 event pool 中取出 event, 然后对可操作的 socket 做操作, 使用 socket 发送/接收数据等等.
+ * 还有一些 socket 的内部逻辑操作.
+ * @param socket_server
+ * @param socket_message 操作结果
+ * @param more 猜想是预留参数
+ * @return 上面定义的宏 SOCKET_XXX 这些
+ */
 int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);
 
+/// 请求退出
 void socket_server_exit(struct socket_server *);
+
+/// 请求关闭指定的 socket
 void socket_server_close(struct socket_server *, uintptr_t opaque, int id);
+
+
 void socket_server_start(struct socket_server *, uintptr_t opaque, int id);
 
 // return -1 when error
+// 错误时返回 -1
+
+/// 请求使用 [高] 优先级队列发送数据. 成功返回当前待发送数据的大小, 否则返回 -1
 int64_t socket_server_send(struct socket_server *, int id, const void * buffer, int sz);
+
+/// 请求使用 [低] 优先级队列发送数据. 成功返回当前待发送数据的大小, 否则返回 -1
 void socket_server_send_lowpriority(struct socket_server *, int id, const void * buffer, int sz);
 
 // ctrl command below returns id
+// 控制命令在返回的 id 掩饰之下
+/// 请求开始侦听指定的 [地址, 端口], 返回值, 成功返回 socket id, 否则返回 -1
+/// 这个函数首先会 bind, 然后再 listen
 int socket_server_listen(struct socket_server *, uintptr_t opaque, const char * addr, int port, int backlog);
+
+/// 请求连接到指定的主机. 返回值, 如果请求成功返回 socket id, 否则返回 -1
 int socket_server_connect(struct socket_server *, uintptr_t opaque, const char * addr, int port);
+
+/// 请求将指定的 fd 设置为 bind 状态
 int socket_server_bind(struct socket_server *, uintptr_t opaque, int fd);
 
 // for tcp
@@ -58,11 +82,14 @@ struct socket_udp_address;
 // create an udp socket handle, attach opaque with it . udp socket don't need call socket_server_start to recv message
 // if port != 0, bind the socket . if addr == NULL, bind ipv4 0.0.0.0 . If you want to use ipv6, addr can be "::" and port 0.
 int socket_server_udp(struct socket_server *, uintptr_t opaque, const char * addr, int port);
+
 // set default dest address, return 0 when success
 int socket_server_udp_connect(struct socket_server *, int id, const char * addr, int port);
+
 // If the socket_udp_address is NULL, use last call socket_server_udp_connect address instead
 // You can also use socket_server_send 
 int64_t socket_server_udp_send(struct socket_server *, int id, const struct socket_udp_address *, const void *buffer, int sz);
+
 // extract the address of the message, struct socket_message * should be SOCKET_UDP
 const struct socket_udp_address * socket_server_udp_address(struct socket_server *, struct socket_message *, int *addrsz);
 

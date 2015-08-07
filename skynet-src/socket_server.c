@@ -15,22 +15,22 @@
 #include <assert.h>
 #include <string.h>
 
-#define MAX_INFO 128
+#define MAX_INFO 128			// socker_server 存储一些信息数据分配的内存空间
 // MAX_SOCKET will be 2^MAX_SOCKET_P
 #define MAX_SOCKET_P 16			// 开启 socket 数量的幂, 直接控制当前 skynet 节点能够操作的 socket 数量
-#define MAX_EVENT 64
+#define MAX_EVENT 64			// 每次从 event pool 中读取 event 的最大数量
 #define MIN_READ_BUFFER 64		// 初始化 socket 读取数据的最小字节数
 
 // socket 的状态
-#define SOCKET_TYPE_INVALID 0
-#define SOCKET_TYPE_RESERVE 1
-#define SOCKET_TYPE_PLISTEN 2
-#define SOCKET_TYPE_LISTEN 3
+#define SOCKET_TYPE_INVALID 0		// 为使用的 socket 标记, 只有 socket 在这个状态才能被 reserve
+#define SOCKET_TYPE_RESERVE 1		// 表示当前 socket 已经有人预约了, 在这个状态的 socket 才能 new_fd(生成 socket)
+#define SOCKET_TYPE_PLISTEN 2		// 正在侦听客户端发起的连接, 但是还没有被 start_socket 调用, 这时还无法接收客户端的连接
+#define SOCKET_TYPE_LISTEN 3		// 这时才是真正的可以 accpet, 对连接的客户端生成对应 socket
 #define SOCKET_TYPE_CONNECTING 4	// socket 正在连接状态, 会将 socket fd 添加到 event pool 中, 根据事件再判断是否连接
 #define SOCKET_TYPE_CONNECTED 5		// socket 已连接状态
-#define SOCKET_TYPE_HALFCLOSE 6
-#define SOCKET_TYPE_PACCEPT 7
-#define SOCKET_TYPE_BIND 8
+#define SOCKET_TYPE_HALFCLOSE 6		// 当前的请求主动关闭 socket, 可以认为当前 socket 正在关闭.
+#define SOCKET_TYPE_PACCEPT 7		// 当有新的 socket 接入的时候, 新接入的 socket 标记为这个状态, 表示刚刚连接
+#define SOCKET_TYPE_BIND 8			// 当前用于 bind 的 socket, socket 服务端的操作流程 bind -> listen -> accept
 
 // 最大的 socket 连接数
 #define MAX_SOCKET (1<<MAX_SOCKET_P)
@@ -98,15 +98,15 @@ struct socket {
 struct socket_server {
 	int recvctrl_fd;		// pipe 函数的读取端
 	int sendctrl_fd;		// pipe 函数的写入端
-	int checkctrl;
+	int checkctrl;			// 标记是否需要操作管道
 	poll_fd event_fd;		// event pool 的文件描述符
 	int alloc_id;			// 分配的 id 计数
-	int event_n;
-	int event_index;
+	int event_n;			// 实际从 event pool 中读取数据的数量
+	int event_index;		// 当前处理到的 event 索引
 	struct socket_object_interface soi;	// 用户数据类型的内存操作接口
 	struct event ev[MAX_EVENT];			// 从 event poll 得到事件的集合
 	struct socket slot[MAX_SOCKET];		// 连接的 socket 集合
-	char buffer[MAX_INFO];
+	char buffer[MAX_INFO];				// 存储一些信息内容, 一般存储 IP 地址信息
 	uint8_t udpbuffer[MAX_UDP_PACKAGE];	// 接收到的 udp 数据内容
 	fd_set rfds;						// select 函数中判断是否有可读字符集
 };
@@ -196,10 +196,11 @@ struct request_udp {
 	C set udp address
  */
 
+/// 这里也是一个很屌的处理, 每个 request_package 变量, 所占的内存空间是连续的 8 + 256 + 256 = 520 字节大小
 struct request_package {
-	uint8_t header[8];	// 6 bytes dummy
+	uint8_t header[8];	// 6 bytes dummy, 前 6 个字节没有使用
 	union {
-		char buffer[256];
+		char buffer[256];		// 这个 buffer 其实不会直接使用, 为的是保证分配的内存空间足够 256 大小
 		struct request_open open;
 		struct request_send send;
 		struct request_send_udp send_udp;
@@ -211,7 +212,7 @@ struct request_package {
 		struct request_udp udp;
 		struct request_setudp set_udp;
 	} u;
-	uint8_t dummy[256];
+	uint8_t dummy[256];	// 这是一个虚拟的内存空间, 预留使用, 例如: 可以给 request_open.host 用来存储字符串
 };
 
 /// 是一个方便 sockaddr 操作的整合功能, 因为内部的成员是共享内存空间的, 这个方式有点屌!!!
@@ -619,7 +620,7 @@ open_socket(struct socket_server * ss, struct request_open * request, struct soc
 		// 标记为正在连接状态
 		ns->type = SOCKET_TYPE_CONNECTING;
 
-		// 对其写状态进行侦听, 等待连接完成
+		// 对其写状态进行侦听, 等待连接完成, 当连接成功的时候, 会派发写事件, 这时再设置成 SOCKET_TYPE_CONNECTED, 具体查看函数 report_connect.
 		sp_write(ss->event_fd, ns->fd, ns, true);
 	}
 
@@ -1069,8 +1070,6 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 	// 如果发送链表中还有数据, 需要将数据全部发出
 	if (!send_buffer_empty(s)) { 
 		int type = send_buffer(ss, s, result);
-
-		// 如果出错, 
 		if (type != -1)
 			return type;
 	}
@@ -1111,7 +1110,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 	return SOCKET_OPEN;
 }
 
-/// 根据 request_start 操作 socket, 返回值, 成功返回 SOCKET_OPEN, 否则返回 -1 or SOCKET_ERROR
+/// 根据 request_start 操作 socket, 返回值, 成功返回 SOCKET_OPEN, 失败返回 SOCKET_ERROR, 没做什么处理返回 -1
 static int
 start_socket(struct socket_server *ss, struct request_start *request, struct socket_message *result) {
 	int id = request->id;
@@ -1125,7 +1124,7 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	}
 
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
-		if (sp_add(ss->event_fd, s->fd, s)) {
+		if (sp_add(ss->event_fd, s->fd, s)) {	// 添加到 event pool 中!!!
 			s->type = SOCKET_TYPE_INVALID;
 			return SOCKET_ERROR;
 		}
@@ -1268,14 +1267,19 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 
 	switch (type) {
 	case 'S':
+		// 返回 SOCKET_OPEN, SOCKET_ERROR, -1
 		return start_socket(ss,(struct request_start *)buffer, result);
 	case 'B':
+		// 返回 SOCKET_OPEN, SOCKET_ERROR
 		return bind_socket(ss,(struct request_bind *)buffer, result);
 	case 'L':
+		// 返回 SOCKET_ERROR, -1
 		return listen_socket(ss,(struct request_listen *)buffer, result);
 	case 'K':
+		// 返回 SOCKET_CLOSE, -1 
 		return close_socket(ss,(struct request_close *)buffer, result);
 	case 'O':
+		// 返回 SOCKET_OPEN, SOCKET_ERROR, -1
 		return open_socket(ss, (struct request_open *)buffer, result);
 	case 'X':
 		result->opaque = 0;
@@ -1284,14 +1288,18 @@ ctrl_cmd(struct socket_server *ss, struct socket_message *result) {
 		result->data = NULL;
 		return SOCKET_EXIT;
 	case 'D':
+		// 返回 SOCKET_CLOSE, -1
 		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_HIGH, NULL);
 	case 'P':
+		// 返回 SOCKET_CLOSE, -1
 		return send_socket(ss, (struct request_send *)buffer, result, PRIORITY_LOW, NULL);
 	case 'A': {
 		struct request_send_udp * rsu = (struct request_send_udp *)buffer;
+		// 返回 SOCKET_CLOSE, -1
 		return send_socket(ss, &rsu->send, result, PRIORITY_HIGH, rsu->address);
 	}
 	case 'C':
+		// 返回 SOCKET_ERROR, -1 
 		return set_udp_address(ss, (struct request_setudp *)buffer, result);
 	case 'T':
 		setopt_socket(ss, (struct request_setopt *)buffer);
@@ -1395,6 +1403,16 @@ forward_message_udp(struct socket_server *ss, struct socket *s, struct socket_me
 	// 读取数据
 	union sockaddr_all sa;
 	socklen_t slen = sizeof(sa);
+
+	// ssize_t recvfrom(int sockfd,void *buf,int len,unsigned int flags, struct sockaddr *from,socket_t *fromlen); 
+	// 接收一个数据报并保存源地址。
+	// s：标识一个已连接套接口的描述字。
+	// buf：接收数据缓冲区。
+	// len：缓冲区长度。
+	// flags：调用操作方式。
+	// from：（可选）指针，指向装有源地址的缓冲区。
+	// fromlen：（可选）指针，指向from缓冲区长度值。
+	// 返回值, 若无错误发生，recvfrom()返回读入的字节数。如果连接已中止，返回0。否则的话，返回错误代码
 	int n = recvfrom(s->fd, ss->udpbuffer, MAX_UDP_PACKAGE, 0, &sa.s, &slen);
 
 	// 错误处理
@@ -1464,10 +1482,38 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 		if (send_buffer_empty(s)) {
 			sp_write(ss->event_fd, s->fd, s, false);
 		}
-		
+
 		union sockaddr_all u;
 		socklen_t slen = sizeof(u);
+
+		// int getpeername(int s, struct sockaddr *name, socklen_t *namelen);
+		// 获取与套接口相连的端地址。
+		// s：标识一已连接套接口的描述字。
+		// name：接收端地址的名字结构。
+		// namelen：返回名字结构的长度。
+		// 返回值, 成功返回 0, 否则返回错误代码
+
+		/*
+		getsockname和getpeername调度时机很重要，如果调用时机不对，则无法正确获得地址和端口。
+		
+		TCP
+		对于服务器来说，在bind以后就可以调用getsockname来获取本地地址和端口，虽然这没有什么太多的意义。
+		getpeername只有在链接建立以后才调用，否则不能正确获得对方地址和端口，所以他的参数描述字一般是链接描述字而非监听套接口描述字。
+
+		对于客户端来说，在调用socket时候内核还不会分配IP和端口，此时调用getsockname不会获得正确的端口和地址（当然链接没建立更不可能调用getpeername），
+		当然如果调用了bind 以后可以使用getsockname。想要正确的到对方地址（一般客户端不需要这个功能），则必须在链接建立以后，同样链接建立以后，
+		此时客户端地址和端口就已经被指定，此时是调用getpeername的时机。
+
+		UDP
+		UDP分为链接和没有链接2种
+
+		没有链接的UDP不能调用getpeername，但是可以调用getsockname, 和TCP一样，他的地址和端口不是在调用socket就指定，而是在第一次调用sendto函数以后.
+
+		已经链接的UDP，在调用connect以后，这2个函数都是可以用的（同样，getpeername也没太大意义。如果你不知道对方的地址和端口，不可能会调用connect）。
+		*/
+
 		if (getpeername(s->fd, &u.s, &slen) == 0) {
+			// 得到被连接端的地址信息, 用字符串存储起来
 			void * sin_addr = (u.s.sa_family == AF_INET) ? (void*)&u.v4.sin_addr : (void *)&u.v6.sin6_addr;
 			if (inet_ntop(u.s.sa_family, sin_addr, ss->buffer, sizeof(ss->buffer))) {
 				result->data = ss->buffer;
@@ -1475,37 +1521,70 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 			}
 		}
 		result->data = NULL;
+
+		// 即使 getpeername 会出错, 但是不能保证这个 socket 未连接, 所以还是认为连接成功.
+		// 在后面的逻辑中再去处理 socket 是否连接的问题.
 		return SOCKET_OPEN;
 	}
 }
 
 // return 0 when failed
+// 失败的时候返回 0
+
+/// 通过 accpet 得到连接的 socket, 成功返回 1, 否则返回 0
 static int
 report_accept(struct socket_server *ss, struct socket *s, struct socket_message *result) {
+
+	// 存储连接端的地址信息
 	union sockaddr_all u;
 	socklen_t len = sizeof(u);
+
+	// int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+	// 在一个套接口接受一个连接。
+	// sockfd：套接口描述字，该套接口在 listen() 后监听连接。
+	// addr：（可选）指针，指向一缓冲区，其中接收为通讯层所知的连接实体的地址。Addr参数的实际格式由套接口创建时所产生的地址族确定。
+	// addrlen：（可选）指针，输入参数，配合addr一起使用，指向存有addr地址长度的整型数。
+	// 如果 addr 与 addrlen 中有一个为 0/NULL，将不返回所接受的套接口远程地址的任何信息。
+	// 返回值, 如果成功返回连接成功的 socket 的文件描述符, 否则返回错误代码
 	int client_fd = accept(s->fd, &u.s, &len);
+
+	// 如果没有连接的 socket 函数直接返回
 	if (client_fd < 0) {
 		return 0;
 	}
+
+	// 拿到一个可用的 socket id, 该 socket 已经标记为 SOCKET_TYPE_RESERVE
 	int id = reserve_id(ss);
+
+	// 如果没有可用的 id, 那么将关闭掉连接的 socket, 并且函数直接返回
 	if (id < 0) {
 		close(client_fd);
 		return 0;
 	}
+
+	// 开启保持活动检测
 	socket_keepalive(client_fd);
+
+	// 连接的 socket 是非阻塞的方式工作
 	sp_nonblocking(client_fd);
+
+	// 使用之前保留的 id, 生成一个 socket, 注意, 这时不会注册到 event pool 中.
 	struct socket *ns = new_fd(ss, id, client_fd, PROTOCOL_TCP, s->opaque, false);
 	if (ns == NULL) {
 		close(client_fd);
 		return 0;
 	}
+
+	// 标记为 SOCKET_TYPE_PACCEPT 状态
 	ns->type = SOCKET_TYPE_PACCEPT;
+
+	// 记录操作结果
 	result->opaque = s->opaque;
 	result->id = s->id;
-	result->ud = id;
+	result->ud = id;	// 在 paccept 时, ud 保存的是 id
 	result->data = NULL;
 
+	// 将连接端的地址信息转化为字符串, 并存储起来
 	void * sin_addr = (u.s.sa_family == AF_INET) ? (void*)&u.v4.sin_addr : (void *)&u.v6.sin6_addr;
 	int sin_port = ntohs((u.s.sa_family == AF_INET) ? u.v4.sin_port : u.v6.sin6_port);
 	char tmp[INET6_ADDRSTRLEN];
@@ -1517,6 +1596,8 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 	return 1;
 }
 
+/// 对于操作产生 SOCKET_CLOSE 和 SOCKET_ERROR 的 socket, 在 event pool 中查询到关联的 event, 将 event 的 s 设置为 NULL.
+/// 这样 event 不论是可读还是可写, 都无法再操作 socket. 当然, 前提是该 socket 的状态也已经是 SOCKET_TYPE_INVALID
 static inline void 
 clear_closed_event(struct socket_server *ss, struct socket_message * result, int type) {
 	if (type == SOCKET_CLOSE || type == SOCKET_ERROR) {
@@ -1535,24 +1616,33 @@ clear_closed_event(struct socket_server *ss, struct socket_message * result, int
 }
 
 // return type
+// 返回类型
 int 
 socket_server_poll(struct socket_server *ss, struct socket_message * result, int * more) {
 	for (;;) {
+
 		if (ss->checkctrl) {
+			// 如果有数据可读
 			if (has_cmd(ss)) {
+				// 执行命令, 返回的是 -1 表明需要继续处理后续的命令
 				int type = ctrl_cmd(ss, result);
 				if (type != -1) {
+					// 处理 SOCKET_CLOSE 和 SOCKET_ERROR 的 socket
 					clear_closed_event(ss, result, type);
 					return type;
 				} else
 					continue;
+
+			// 没有命令可读的时候设置标记
 			} else {
 				ss->checkctrl = 0;
 			}
 		}
+
+		// 当事件处理完的时候, 从新获取新的时间集合
 		if (ss->event_index == ss->event_n) {
 			ss->event_n = sp_wait(ss->event_fd, ss->ev, MAX_EVENT);
-			ss->checkctrl = 1;
+			ss->checkctrl = 1;	// 标记为需要从管道读取数据
 			if (more) {
 				*more = 0;
 			}
@@ -1562,16 +1652,23 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				return -1;
 			}
 		}
+
+		// 获得一个 event
 		struct event *e = &ss->ev[ss->event_index++];
 		struct socket *s = e->s;
 		if (s == NULL) {
 			// dispatch pipe message at beginning
+			// 在开始的时候分派管道的消息
 			continue;
 		}
+
+		// 根据 socket 的 type 做逻辑处理
+
 		switch (s->type) {
-		case SOCKET_TYPE_CONNECTING:
+		case SOCKET_TYPE_CONNECTING:	// 这个在之前也介绍过(open_socket), 正在连接主机, 这时接收到可读或者可写事件的时候则认为已经连接成功了
+			// 返回 SOCKET_ERROR, SOCKET_OPEN
 			return report_connect(ss, s, result);
-		case SOCKET_TYPE_LISTEN:
+		case SOCKET_TYPE_LISTEN:		// 此时这个 socket 正在 listen
 			if (report_accept(ss, s, result)) {
 				return SOCKET_ACCEPT;
 			} 
@@ -1580,32 +1677,48 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 			fprintf(stderr, "socket-server: invalid socket\n");
 			break;
 		default:
+			// 如果可读
 			if (e->read) {
 				int type;
 				if (s->protocol == PROTOCOL_TCP) {
+					// 返回 SOCKET_ERROR, SOCKET_CLOSE, SOCKET_DATA, -1
 					type = forward_message_tcp(ss, s, result);
 				} else {
+					// 返回 SOCKET_ERROR, SOCKET_UDP, -1 
 					type = forward_message_udp(ss, s, result);
 					if (type == SOCKET_UDP) {
 						// try read again
+						// 尝试再读一次
 						--ss->event_index;
+
 						return SOCKET_UDP;
 					}
 				}
+
 				if (e->write) {
 					// Try to dispatch write message next step if write flag set.
+					// 如果 write 为 true, 那么尝试在在下次循环的时候调度写信息操作
 					e->read = false;
 					--ss->event_index;
 				}
+
 				if (type == -1)
 					break;
+
+				// 对产生 SOCKET_ERROR 和 SOCKET_CLOSE 的 socket 并且关联着这个 socket 的 event 做处理
 				clear_closed_event(ss, result, type);
 				return type;
 			}
+
+			// 如果可写
 			if (e->write) {
+				// 发送数据
 				int type = send_buffer(ss, s, result);
+				
 				if (type == -1)
 					break;
+
+				// 对产生 SOCKET_ERROR 和 SOCKET_CLOSE 的 socket 并且关联着这个 socket 的 event 做处理
 				clear_closed_event(ss, result, type);
 				return type;
 			}
@@ -1614,36 +1727,53 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 	}
 }
 
+/// 将 type 和 len 数据写入到管道中
 static void
 send_request(struct socket_server *ss, struct request_package *request, char type, int len) {
 	request->header[6] = (uint8_t)type;
 	request->header[7] = (uint8_t)len;
+
+	// 必须保证数据写入
 	for (;;) {
 		int n = write(ss->sendctrl_fd, &request->header[6], len+2);
-		if (n<0) {
+
+		if (n < 0) {
 			if (errno != EINTR) {
 				fprintf(stderr, "socket-server : send ctrl command error %s.\n", strerror(errno));
 			}
 			continue;
 		}
+
+		// 保证数据完全写入
 		assert(n == len+2);
 		return;
 	}
 }
 
+/// 初始化一个 request_open, 数据赋值给 req.u.open
+/// 返回值, 成功返回主机地址的(addr)的字符串长度, 失败返回 -1
 static int
 open_request(struct socket_server *ss, struct request_package *req, uintptr_t opaque, const char *addr, int port) {
+
+	// 主机地址验证
 	int len = strlen(addr);
 	if (len + sizeof(req->u.open) >= 256) {
 		fprintf(stderr, "socket-server : Invalid addr %s.\n",addr);
 		return -1;
 	}
+
+	// 申请一个可用的 socket id
 	int id = reserve_id(ss);
 	if (id < 0)
 		return -1;
+
 	req->u.open.opaque = opaque;
 	req->u.open.id = id;
 	req->u.open.port = port;
+
+	// 因为 request_package 分配的内存空间足够大, 所以这样处理是没有问题的, 尽管 open.host 表示的是 1 个大小的 char 数组,
+	// 但是 request_package 为 u.open.host 预留了足够的连续内存空间, 所以可以直接 memcpy 而不用担心内存覆盖问题. 
+	// 其实也就是把 addr 的数据放入到 request_package 的内存空间中.
 	memcpy(req->u.open.host, addr, len);
 	req->u.open.host[len] = '\0';
 
@@ -1652,14 +1782,18 @@ open_request(struct socket_server *ss, struct request_package *req, uintptr_t op
 
 int 
 socket_server_connect(struct socket_server *ss, uintptr_t opaque, const char * addr, int port) {
+	// 生成一个 request_open
 	struct request_package request;
 	int len = open_request(ss, &request, opaque, addr, port);
 	if (len < 0)
 		return -1;
+
+	// 将 request_open 的数据写入到管道中
 	send_request(ss, &request, 'O', sizeof(request.u.open) + len);
 	return request.u.open.id;
 }
 
+/// 释放 buffer 资源
 static void
 free_buffer(struct socket_server *ss, const void * buffer, int sz) {
 	struct send_object so;
@@ -1668,36 +1802,46 @@ free_buffer(struct socket_server *ss, const void * buffer, int sz) {
 }
 
 // return -1 when error
+// 错误的时候返回 -1
 int64_t 
 socket_server_send(struct socket_server *ss, int id, const void * buffer, int sz) {
+
+	// 有效性校验
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		free_buffer(ss, buffer, sz);
 		return -1;
 	}
 
+	// 生成一个 request_send
 	struct request_package request;
 	request.u.send.id = id;
 	request.u.send.sz = sz;
 	request.u.send.buffer = (char *)buffer;
 
+	// 将 request_send 写入到管道中
 	send_request(ss, &request, 'D', sizeof(request.u.send));
+
 	return s->wb_size;
 }
 
 void 
 socket_server_send_lowpriority(struct socket_server *ss, int id, const void * buffer, int sz) {
+
+	// 有效性校验
 	struct socket * s = &ss->slot[HASH_ID(id)];
 	if (s->id != id || s->type == SOCKET_TYPE_INVALID) {
 		free_buffer(ss, buffer, sz);
 		return;
 	}
 
+	// 生成一个 request_send
 	struct request_package request;
 	request.u.send.id = id;
 	request.u.send.sz = sz;
 	request.u.send.buffer = (char *)buffer;
 
+	// 将 request_send 写入到管道中
 	send_request(ss, &request, 'P', sizeof(request.u.send));
 }
 
@@ -1709,14 +1853,20 @@ socket_server_exit(struct socket_server *ss) {
 
 void
 socket_server_close(struct socket_server *ss, uintptr_t opaque, int id) {
+	// 生成 request_close
 	struct request_package request;
 	request.u.close.id = id;
 	request.u.close.opaque = opaque;
+
+	// 将 request_close 写入管道中
 	send_request(ss, &request, 'K', sizeof(request.u.close));
 }
 
 // return -1 means failed
 // or return AF_INET or AF_INET6
+// 失败时返回 -1, 成功的情况下 参数 family 等于 AF_INET 或者 AF_INET6
+
+/// bind 到指定的 [地址, 端口], 失败返回 -1, 成功得到 bind 成功的 socket 的文件描述符
 static int
 do_bind(const char *host, int port, int protocol, int *family) {
 	int fd;
@@ -1726,11 +1876,17 @@ do_bind(const char *host, int port, int protocol, int *family) {
 	struct addrinfo *ai_list = NULL;
 	char portstr[16];
 	if (host == NULL || host[0] == 0) {
-		host = "0.0.0.0";	// INADDR_ANY
+		host = "0.0.0.0";	// INADDR_ANY, 就是指定地址为0.0.0.0的地址，这个地址事实上表示不确定地址，或“所有地址”、“任意地址”。 一般来说，在各个系统中均定义成为0值。
 	}
+
+	// 端口字符串格式化
 	sprintf(portstr, "%d", port);
+
 	memset( &ai_hints, 0, sizeof( ai_hints ) );
+
 	ai_hints.ai_family = AF_UNSPEC;
+
+	// 指定协议
 	if (protocol == IPPROTO_TCP) {
 		ai_hints.ai_socktype = SOCK_STREAM;
 	} else {
@@ -1739,31 +1895,47 @@ do_bind(const char *host, int port, int protocol, int *family) {
 	}
 	ai_hints.ai_protocol = protocol;
 
+	// 获取地址信息
 	status = getaddrinfo( host, portstr, &ai_hints, &ai_list );
 	if ( status != 0 ) {
 		return -1;
 	}
+
 	*family = ai_list->ai_family;
+
 	fd = socket(*family, ai_list->ai_socktype, 0);
 	if (fd < 0) {
 		goto _failed_fd;
 	}
+
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(int))==-1) {
 		goto _failed;
 	}
+
+	// int bind( int sockfd, const struct sockaddr * my_addr, socklen_t addrlen);
+	// 将一本地地址与一套接口捆绑。
+	// sockfd 表示已经建立的socket编号（描述符）；
+	// my_addr 是一个指向sockaddr结构体类型的指针；
+	// addrlen表示my_addr结构的长度，可以用sizeof函数获得
+	// 返回：成功返回0，失败返回-1.
+
 	status = bind(fd, (struct sockaddr *)ai_list->ai_addr, ai_list->ai_addrlen);
 	if (status != 0)
 		goto _failed;
 
 	freeaddrinfo( ai_list );
+
 	return fd;
+
 _failed:
 	close(fd);
+
 _failed_fd:
 	freeaddrinfo( ai_list );
 	return -1;
 }
 
+/// 侦听指定的 [地址, 端口], 失败返回 -1, 成功返回正在侦听的 socket 文件描述符
 static int
 do_listen(const char * host, int port, int backlog) {
 	int family = 0;
@@ -1771,50 +1943,77 @@ do_listen(const char * host, int port, int backlog) {
 	if (listen_fd < 0) {
 		return -1;
 	}
+
+	// int listen(SOCKET sockfd, int backlog)
+	// listen函数使用主动连接套接字变为被连接套接口，使得一个进程可以接受其它进程的请求，从而成为一个服务器进程。
+	// 在TCP服务器编程中listen函数把进程变为一个服务器，并指定相应的套接字变为被动连接。
+	// listen函数一般在调用bind之后-调用accept之前调用。
+	// sockfd: 一个已绑定未被连接的套接字描述符
+	// backlog: backlog 参数定义了等待连接的队列的最大长度. 如果一个连接请求作用在已满的队列上, 客户端可能会收到一个 ECONNREFUSED 错误. 
+	// 			另外,如果底层协议支持重传,请求可能会被忽略,这样重试可能成功。
+	// 返回：成功返回0，失败返回-1.
+
 	if (listen(listen_fd, backlog) == -1) {
 		close(listen_fd);
 		return -1;
 	}
+
 	return listen_fd;
 }
 
 int 
 socket_server_listen(struct socket_server *ss, uintptr_t opaque, const char * addr, int port, int backlog) {
+	// 开始侦听
 	int fd = do_listen(addr, port, backlog);
 	if (fd < 0) {
 		return -1;
 	}
-	struct request_package request;
+	
+	// 申请 ID
 	int id = reserve_id(ss);
 	if (id < 0) {
 		close(fd);
 		return id;
 	}
+
+	// 生成 request_listen
+	struct request_package request;
 	request.u.listen.opaque = opaque;
 	request.u.listen.id = id;
 	request.u.listen.fd = fd;
+
+	// 将 request_listen 写入管道
 	send_request(ss, &request, 'L', sizeof(request.u.listen));
 	return id;
 }
 
 int
 socket_server_bind(struct socket_server *ss, uintptr_t opaque, int fd) {
-	struct request_package request;
+	
+	// 申请 socket id
 	int id = reserve_id(ss);
 	if (id < 0)
 		return -1;
+
+	// 生成 request_bind
+	struct request_package request;
 	request.u.bind.opaque = opaque;
 	request.u.bind.id = id;
 	request.u.bind.fd = fd;
+
+	// 将 request_bind 写入管道
 	send_request(ss, &request, 'B', sizeof(request.u.bind));
 	return id;
 }
 
 void 
 socket_server_start(struct socket_server *ss, uintptr_t opaque, int id) {
+	// 生成 request_start
 	struct request_package request;
 	request.u.start.id = id;
 	request.u.start.opaque = opaque;
+
+	// 将 request_start 写入管道
 	send_request(ss, &request, 'S', sizeof(request.u.start));
 }
 
