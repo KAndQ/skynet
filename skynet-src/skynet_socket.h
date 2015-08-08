@@ -3,12 +3,12 @@
 
 struct skynet_context;
 
-#define SKYNET_SOCKET_TYPE_DATA 1
-#define SKYNET_SOCKET_TYPE_CONNECT 2
-#define SKYNET_SOCKET_TYPE_CLOSE 3
-#define SKYNET_SOCKET_TYPE_ACCEPT 4
-#define SKYNET_SOCKET_TYPE_ERROR 5
-#define SKYNET_SOCKET_TYPE_UDP 6
+#define SKYNET_SOCKET_TYPE_DATA 1       // tcp 接收到数据
+#define SKYNET_SOCKET_TYPE_CONNECT 2    // 当前 skynet 节点连接到其他主机
+#define SKYNET_SOCKET_TYPE_CLOSE 3      // 关闭当前 socket 
+#define SKYNET_SOCKET_TYPE_ACCEPT 4     // 当前节点接收到新的连接
+#define SKYNET_SOCKET_TYPE_ERROR 5      // socket 出错, 已经无法使用
+#define SKYNET_SOCKET_TYPE_UDP 6        // udp 接收到数据
 
 struct skynet_socket_message {
 	int type;
