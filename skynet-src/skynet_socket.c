@@ -98,9 +98,11 @@ skynet_socket_poll() {
 		skynet_error(NULL, "Unknown socket message type %d.",type);
 		return -1;
 	}
+
 	if (more) {
 		return -1;
 	}
+	
 	return 1;
 }
 

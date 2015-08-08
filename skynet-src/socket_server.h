@@ -1,5 +1,6 @@
 /**
- * socket 的通信实现, 与之关联的只有 socket_pool.h 类型
+ * 底层的 socket 通信逻辑, 与之关联的只有 socket_pool.h
+ * 可以说一个 socket 的教科书教程. 纯纯的 socket 实现, 和山楂树一样.
  */
 
 #ifndef skynet_socket_server_h
@@ -39,7 +40,7 @@ void socket_server_release(struct socket_server *);
  * 还有一些 socket 的内部逻辑操作.
  * @param socket_server
  * @param socket_message 操作结果
- * @param more 猜想是预留参数
+ * @param more 每次当 event pool 事件处理完重置的时候, 会将 *more 的值设置为 0
  * @return 上面定义的宏 SOCKET_XXX 这些
  */
 int socket_server_poll(struct socket_server *, struct socket_message *result, int *more);

@@ -1663,10 +1663,14 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 		if (ss->event_index == ss->event_n) {
 			ss->event_n = sp_wait(ss->event_fd, ss->ev, MAX_EVENT);
 			ss->checkctrl = 1;	// 标记为需要从管道读取数据
+
+			// 告诉通信线程, 这次不需要处理条件信号
 			if (more) {
 				*more = 0;
 			}
+
 			ss->event_index = 0;
+
 			if (ss->event_n <= 0) {
 				ss->event_n = 0;
 				return -1;

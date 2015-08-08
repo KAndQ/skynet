@@ -55,12 +55,15 @@ thread_socket(void *p) {
 	skynet_initthread(THREAD_SOCKET);
 	for (;;) {
 		int r = skynet_socket_poll();
+		
 		if (r == 0)
 			break;
+
 		if (r < 0) {
 			CHECK_ABORT
 			continue;
 		}
+		
 		wakeup(m,0);
 	}
 	return NULL;
