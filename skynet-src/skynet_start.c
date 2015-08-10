@@ -227,11 +227,13 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 
 void 
 skynet_start(struct skynet_config * config) {
+	// 守护进程
 	if (config->daemon) {
 		if (daemon_init(config->daemon)) {
 			exit(1);
 		}
 	}
+
 	skynet_harbor_init(config->harbor);
 	skynet_handle_init(config->harbor);
 	skynet_mq_init();

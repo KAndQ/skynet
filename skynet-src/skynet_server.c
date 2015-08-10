@@ -737,7 +737,7 @@ cmd_abort(struct skynet_context * context, const char * param) {
 	return NULL;
 }
 
-// 添加 skynet_context 在关闭时的监控器, 这个监控器其实也是一个 skynet_context,
+// 添加 skynet_context 在关闭时的监控器, 这个监控器其实也是一个 skynet_context.
 // skynet.monitor 中有使用到.
 static const char *
 cmd_monitor(struct skynet_context * context, const char * param) {
@@ -745,6 +745,7 @@ cmd_monitor(struct skynet_context * context, const char * param) {
 	if (param == NULL || param[0] == '\0') {
 		if (G_NODE.monitor_exit) {
 			// return current monitor serivce
+			// 返回当前的监控服务
 			sprintf(context->result, ":%x", G_NODE.monitor_exit);
 			return context->result;
 		}

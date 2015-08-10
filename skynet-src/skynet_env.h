@@ -1,7 +1,6 @@
 /**
  * skynet_env 主要功能是让不同的服务(因为不同的服务是使用不同的 lua 沙箱)能够访问一些相同的数据.
- * 在当前节点内, 各个服务间可共享的对象.
- * 存储的值只能是字符串类型. 也可以理解为当前节点的一个小缓存数据库.
+ * 在当前节点内, 各个服务间可共享的数据, 一般用于存储节点的配置数据. 字典数据结构.
  */
 
 #ifndef SKYNET_ENV_H
@@ -21,9 +20,7 @@ const char * skynet_getenv(const char *key);
  */
 void skynet_setenv(const char *key, const char *value);
 
-/**
- * 初始化
- */
+/// 当前节点的全局变量初始化
 void skynet_env_init();
 
 #endif

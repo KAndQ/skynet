@@ -3,13 +3,13 @@
 
 // 当前节点配置的数据结构, 由启动的 config 文件提供.
 struct skynet_config {
-	int thread;
-	int harbor;
-	const char * daemon;
-	const char * module_path;
-	const char * bootstrap;
-	const char * logger;
-	const char * logservice;
+	int thread;            // 开启的线程数量
+	int harbor;            // 当前 skynet 节点的 id
+	const char * daemon;   // 守护进程使用文件
+	const char * module_path;  // c 模块的搜索路径
+	const char * bootstrap;    // skynet 启动的第一个服务以及其启动参数
+	const char * logger;       // skynet_error 日志输出的文件
+	const char * logservice;   // 定制的 log 服务
 };
 
 #define THREAD_WORKER 0
