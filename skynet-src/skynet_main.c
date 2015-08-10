@@ -151,7 +151,7 @@ main(int argc, char *argv[]) {
 	struct lua_State *L = lua_newstate(skynet_lalloc, NULL);
 	luaL_openlibs(L);	// link lua lib
 
-	// 加载 config 文件里面的内容, 并将内容导入到 skynet 的 L 中
+	// 加载 config 文件里面的内容, 使用 skynet_setenv 函数, 将数据配置进来
 	int err = luaL_loadstring(L, load_config);
 	assert(err == LUA_OK);
 	lua_pushstring(L, config_file);
