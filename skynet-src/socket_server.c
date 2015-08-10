@@ -99,7 +99,7 @@ struct wb_list {
 };
 
 struct socket {
-	uintptr_t opaque;
+	uintptr_t opaque;		// 不透明的功能作用, 目前在 skynet_socket 中当作 skynet_context 的 handle 使用
 	struct wb_list high;	// 写缓存数据的高优先级链表
 	struct wb_list low;		// 写缓存数据的低优先级链表
 	int64_t wb_size;		// 写数据的总大小, high + low
@@ -115,9 +115,12 @@ struct socket {
 
 // socket_server 服务对象
 struct socket_server {
+	// 用管道来保证多线程操作, 所有的操作命令通过管道存储起来,
+	// 通信线程再从管道将所有的操作命令读取出来.
 	int recvctrl_fd;		// pipe 函数的读取端
 	int sendctrl_fd;		// pipe 函数的写入端
 	int checkctrl;			// 标记是否需要操作管道
+
 	poll_fd event_fd;		// event pool 的文件描述符
 	int alloc_id;			// 分配的 id 计数
 	int event_n;			// 实际从 event pool 中读取数据的数量
@@ -1012,6 +1015,8 @@ send_socket(struct socket_server *ss, struct request_send * request, struct sock
 			append_sendbuffer(ss, s, request, n);
 		} else {
 			// udp
+
+			// 如果没有传入 udp 地址, 则使用上次的发送地址
 			if (udp_address == NULL) {
 				udp_address = s->p.udp_address;
 			}

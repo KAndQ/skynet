@@ -30,8 +30,18 @@ skynet_socket_free() {
 }
 
 // mainloop thread
+// 主循环线程
+
+/**
+ * 将 result 内容转化为 skynet_message 压入到 result->opaque 中
+ * @param type 当前处理的 SOCKET 操作类型
+ * @param padding true 表示 result->data 是字符串类型, 需要在 struct skynet_socket_message 之后填充内容; false 不需要填充
+ * @param result 之前 socket_server 处理得到的结果
+ */
 static void
 forward_message(int type, bool padding, struct socket_message * result) {
+
+	// 计算需要分配的存储空间
 	struct skynet_socket_message *sm;
 	int sz = sizeof(*sm);
 	if (padding) {
@@ -41,17 +51,21 @@ forward_message(int type, bool padding, struct socket_message * result) {
 			result->data = "";
 		}
 	}
+
+	// 将 socket_message 使用 skynet_socket_message 存储
 	sm = (struct skynet_socket_message *)skynet_malloc(sz);
 	sm->type = type;
 	sm->id = result->id;
 	sm->ud = result->ud;
 	if (padding) {
+		// 在 struct skynet_socket_message 的内存之后, 填充内容, 实际的 sm->buffer 指针设置为 NULL
 		sm->buffer = NULL;
-		memcpy(sm+1, result->data, sz - sizeof(*sm));
+		memcpy(sm + 1, result->data, sz - sizeof(*sm));
 	} else {
 		sm->buffer = result->data;
 	}
 
+	// 将 skynet_socket_message 使用 skynet_message 保存数据
 	struct skynet_message message;
 	message.source = 0;
 	message.session = 0;
@@ -60,7 +74,9 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	
 	if (skynet_context_push((uint32_t)result->opaque, &message)) {
 		// todo: report somewhere to close socket
+		// 待办事项: 报告在某处关闭 socket
 		// don't call skynet_socket_close here (It will block mainloop)
+		// 不要在这里点用 skynet_socket_close 方法(它会阻塞主线程)
 		skynet_free(sm->buffer);
 		skynet_free(sm);
 	}
@@ -83,12 +99,17 @@ skynet_socket_poll() {
 		forward_message(SKYNET_SOCKET_TYPE_CLOSE, false, &result);
 		break;
 	case SOCKET_OPEN:
+		// 在主动去连接其他 socket 的时候, result->data 存储的字符串数据是连接方的地址, socket_server.buffer 的数据.;
+		// bind 的时候存储的是 "binding";
+		// socket 从 PACCEPT -> CONNECTED 或者 socket 从 PLISTEN -> LISTEN 时存储的是 "start";
+		// 当 socket 是 CONNECTED 状态时, 存储的是 "transfer".
 		forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
 		break;
 	case SOCKET_ERROR:
 		forward_message(SKYNET_SOCKET_TYPE_ERROR, false, &result);
 		break;
 	case SOCKET_ACCEPT:
+		// 当有其他 socket 连接到侦听的 socket, result->data 以 "xxx.xxx.xxx.xxx:端口号" 的格式保存连接方的地址信息, socket_server.buffer 的数据.
 		forward_message(SKYNET_SOCKET_TYPE_ACCEPT, true, &result);
 		break;
 	case SOCKET_UDP:
@@ -102,10 +123,11 @@ skynet_socket_poll() {
 	if (more) {
 		return -1;
 	}
-	
+
 	return 1;
 }
 
+/// 检测/警告 id 对应的 socket 有多少数据没有被发送
 static int
 check_wsz(struct skynet_context *ctx, int id, void *buffer, int64_t wsz) {
 	if (wsz < 0) {

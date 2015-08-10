@@ -49,6 +49,7 @@ wakeup(struct monitor *m, int busy) {
 	}
 }
 
+/// 通信线程
 static void *
 thread_socket(void *p) {
 	struct monitor * m = p;
@@ -63,8 +64,8 @@ thread_socket(void *p) {
 			CHECK_ABORT
 			continue;
 		}
-		
-		wakeup(m,0);
+
+		wakeup(m, 0);
 	}
 	return NULL;
 }

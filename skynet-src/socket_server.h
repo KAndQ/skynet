@@ -21,7 +21,7 @@ struct socket_server;
 /// 主要用于在操作 socket 时, 存储的操作 socket 的相关信息
 struct socket_message {
 	int id;            // socket id
-	uintptr_t opaque;
+	uintptr_t opaque;  // 不透明的功能作用, 目前在 skynet_socket 中当作 skynet_context 的 handle 使用
 
     // for accept, ud is listen id; for data, ud is size of data.
     // 对于 accpet, ud 是侦听的 id; 对于 data, ud 是数据的大小
@@ -51,7 +51,7 @@ void socket_server_exit(struct socket_server *);
 /// 请求关闭指定的 socket
 void socket_server_close(struct socket_server *, uintptr_t opaque, int id);
 
-/// 请求打开一个可操作的 socket
+/// 请求打开一个 socket, socket 在 start 之后才能被操作
 void socket_server_start(struct socket_server *, uintptr_t opaque, int id);
 
 // return -1 when error
