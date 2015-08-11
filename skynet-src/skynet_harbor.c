@@ -1,6 +1,8 @@
 #include "skynet.h"
 #include "skynet_harbor.h"
 #include "skynet_server.h"
+#include "skynet_mq.h"
+#include "skynet_handle.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -14,12 +16,12 @@ static unsigned int HARBOR = ~0;	// 0xffffffff
 
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
-
+	
 	// 获得当前发送消息的类型, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
-	int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
+	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
 
 	// 截取实际的发送数据大小
-	rmsg->sz &= HANDLE_MASK;
+	rmsg->sz &= MESSAGE_TYPE_MASK;
 
 	// type 校验
 	assert(type != PTYPE_SYSTEM && type != PTYPE_HARBOR && REMOTE);

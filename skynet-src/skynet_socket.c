@@ -43,7 +43,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 
 	// 计算需要分配的存储空间
 	struct skynet_socket_message *sm;
-	int sz = sizeof(*sm);
+	size_t sz = sizeof(*sm);
 	if (padding) {
 		if (result->data) {
 			sz += strlen(result->data);
@@ -70,7 +70,7 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	message.source = 0;
 	message.session = 0;
 	message.data = sm;
-	message.sz = sz | PTYPE_SOCKET << HANDLE_REMOTE_SHIFT;
+	message.sz = sz | ((size_t)PTYPE_SOCKET << MESSAGE_TYPE_SHIFT);
 	
 	if (skynet_context_push((uint32_t)result->opaque, &message)) {
 		// todo: report somewhere to close socket

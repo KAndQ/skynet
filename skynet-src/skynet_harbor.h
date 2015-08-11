@@ -15,13 +15,6 @@
 // 整个 skynet 网络节点的数量
 #define REMOTE_MAX 256
 
-// reserve high 8 bits for remote id
-// 保留高 8 位作为远程节点的 id
-#define HANDLE_MASK 0x00ffffff        // 用于计算 handle 的值
-
-// 计算 handle 时的位偏移量
-#define HANDLE_REMOTE_SHIFT 24
-
 // 远程节点的数据结构
 struct remote_name {
 	char name[GLOBALNAME_LENGTH];  // skynet 节点的名字

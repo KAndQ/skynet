@@ -11,13 +11,18 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-// skynet 内部传输数据
+// skynet 内部传输数据, 在各个 skynet_context 之间.
 struct skynet_message {
 	uint32_t source;       // 发送源
 	int session;           // session, 细节查看 skynet.h
 	void * data;           // 数据内容
 	size_t sz;             // 数据内容大小, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
 };
+
+// type is encoding in skynet_message.sz high 8 bit
+// 类型编码在 skynet_message.sz 的高 8 位.
+#define MESSAGE_TYPE_MASK (SIZE_MAX >> 8)
+#define MESSAGE_TYPE_SHIFT ((sizeof(size_t)-1) * 8)
 
 struct message_queue;
 
