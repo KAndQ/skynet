@@ -12,6 +12,7 @@ struct skynet_config {
 	const char * logservice;   // 定制的 log 服务
 };
 
+// 以下是各个线程私有变量初始化时使用的值
 #define THREAD_WORKER 0
 #define THREAD_MAIN 1
 #define THREAD_SOCKET 2
@@ -20,7 +21,7 @@ struct skynet_config {
 
 /**
  * 根据配置, 启动 skynet 节点
- * @param config 节点配置
+ * @param config 节点配置, skynet_config 的初始化请看 skynet_main.c
  */
 void skynet_start(struct skynet_config * config);
 

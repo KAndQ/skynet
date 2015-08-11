@@ -477,6 +477,7 @@ skynet_updatetime(void) {
 		// 说明 current 已经累计并超过 0xffffffff
 		if (TI->current < oc) {
 			// when cs > 0xffffffff(about 497 days), time rewind
+			// 当 cs > 0xffffffff(大约 497 天), 时间倒回
 			TI->starttime += 0xffffffff / 100;
 		}
 

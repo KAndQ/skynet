@@ -11,7 +11,7 @@
 /**
  * 添加计时器
  * @param handle skynet_context 的 handle
- * @param time 计时时间
+ * @param time 计时时间, 以厘秒为单位
  * @param session 会话 session
  * @return 如果 handle 对应的 skynet_context 不存在, 并且 time 参数是 0 的时候, 返回 -1, 否则返回 session 值
  */

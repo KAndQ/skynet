@@ -1177,7 +1177,7 @@ setopt_socket(struct socket_server *ss, struct request_setopt *request) {
 	setsockopt(s->fd, IPPROTO_TCP, request->what, &v, sizeof(v));
 }
 
-/// 以阻塞的方式, 从总管道读出数据
+/// 以阻塞的方式, 从管道读出数据, 就是这里会让整个通信线程阻塞
 static void
 block_readpipe(int pipefd, void *buffer, int sz) {
 	for (;;) {
