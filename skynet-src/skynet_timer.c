@@ -59,7 +59,6 @@ struct timer {
 	// t[2]: 表示第三个数量级, [0x100000, 0x3FFFFFF];
 	// t[3]: 表示第四个数量级, [0x4000000, 0xFFFFFFFF];
 	struct link_list t[4][TIME_LEVEL];
-
 	struct spinlock lock;		// 线程安全锁
 	uint32_t time;				// 不断累加的计时计数, 可以理解为以厘秒为单位
 	uint32_t current;			// 从 skynet 节点的启动系统时间开始, 每次 update 都会更新一次, 以厘秒为单位
@@ -278,7 +277,7 @@ timer_execute(struct timer *T) {
 		struct timer_node *current = link_clear(&T->near[idx]);
 
 		SPIN_UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
-		
+
 		// dispatch_list don't need lock T
 		// dispatch_list 函数不需要锁住 T
 		dispatch_list(current);
