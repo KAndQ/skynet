@@ -47,14 +47,20 @@ get_allocated_field(uint32_t handle) {
 	// 判断当前这个 handle 是否已经被占用, 或者是否已经分配了内存.
 	if(old_handle == 0 || old_alloc <= 0) {
 		// data->allocated may less than zero, because it may not count at start.
+<<<<<<< HEAD
 		// 译文: data->allocated 可能小于 0, 因为它可能在开始的时候没有计数.
 		// 将 handle 赋值给 data->handle, 并且成功之后, 才继续进行下面的处理.
+=======
+>>>>>>> cloudwu/master
 		if(!ATOM_CAS(&data->handle, old_handle, handle)) {
 			return 0;
 		}
 
 		if (old_alloc < 0) {
+<<<<<<< HEAD
 			// 保证其他线程没有对 data->allocated 做操作的时候, 设置 data->allocated 为 0.
+=======
+>>>>>>> cloudwu/master
 			ATOM_CAS(&data->allocated, old_alloc, 0);
 		}
 	}
@@ -74,6 +80,7 @@ get_allocated_field(uint32_t handle) {
  */
 inline static void 
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
+<<<<<<< HEAD
 	// _used_memory += __n
 	ATOM_ADD(&_used_memory, __n);
 
@@ -81,6 +88,10 @@ update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
 	ATOM_INC(&_memory_block); 
 
 	// allocated += __n
+=======
+	ATOM_ADD(&_used_memory, __n);
+	ATOM_INC(&_memory_block); 
+>>>>>>> cloudwu/master
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
 		ATOM_ADD(allocated, __n);
@@ -94,6 +105,7 @@ update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
  */
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
+<<<<<<< HEAD
 	// _used_memory -= __n
 	ATOM_SUB(&_used_memory, __n);
 
@@ -101,6 +113,10 @@ update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 	ATOM_DEC(&_memory_block);
 
 	// allocated -= __n
+=======
+	ATOM_SUB(&_used_memory, __n);
+	ATOM_DEC(&_memory_block);
+>>>>>>> cloudwu/master
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
 		ATOM_SUB(allocated, __n);

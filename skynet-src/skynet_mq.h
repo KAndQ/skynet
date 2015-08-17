@@ -19,8 +19,12 @@ struct skynet_message {
 	size_t sz;             // 数据内容大小, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
 };
 
+<<<<<<< HEAD
 // type is encoding in skynet_message.sz high 8 bit
 // 类型编码在 skynet_message.sz 的高 8 位.
+=======
+// type is encoding in skynet_message.sz high 8bit
+>>>>>>> cloudwu/master
 #define MESSAGE_TYPE_MASK (SIZE_MAX >> 8)
 #define MESSAGE_TYPE_SHIFT ((sizeof(size_t)-1) * 8)
 

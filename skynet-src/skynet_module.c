@@ -18,10 +18,17 @@
 #define MAX_MODULE_TYPE 32
 
 struct modules {
+<<<<<<< HEAD
 	int count;	// 统计当前模块的数量
 	struct spinlock lock;	// 多线程锁
 	const char * path;	// 模块的搜索路径
 	struct skynet_module m[MAX_MODULE_TYPE];	// skynet_module 数组
+=======
+	int count;
+	struct spinlock lock;
+	const char * path;
+	struct skynet_module m[MAX_MODULE_TYPE];
+>>>>>>> cloudwu/master
 };
 
 static struct modules * M = NULL;
@@ -165,7 +172,10 @@ skynet_module_query(const char * name) {
 	if (result)
 		return result;
 
+<<<<<<< HEAD
 	// 如果没有加载, 保证线程的安全性
+=======
+>>>>>>> cloudwu/master
 	SPIN_LOCK(M)
 
 	// 再查询一次, 判断是否其他线程又加载这个模块, 因为有可能在运行上次查询和上锁之间的那段代码之间已经加载了模块
@@ -194,7 +204,10 @@ skynet_module_query(const char * name) {
 
 void 
 skynet_module_insert(struct skynet_module *mod) {
+<<<<<<< HEAD
 	// 保证线程安全
+=======
+>>>>>>> cloudwu/master
 	SPIN_LOCK(M)
 
 	// 保证 mod 之前并没有插入到集合中

@@ -59,12 +59,21 @@ struct timer {
 	// t[2]: 表示第三个数量级, [0x100000, 0x3FFFFFF];
 	// t[3]: 表示第四个数量级, [0x4000000, 0xFFFFFFFF];
 	struct link_list t[4][TIME_LEVEL];
+<<<<<<< HEAD
 	struct spinlock lock;		// 线程安全锁
 	uint32_t time;				// 不断累加的计时计数, 可以理解为以厘秒为单位
 	uint32_t current;			// 从 skynet 节点的启动系统时间开始, 每次 update 都会更新一次, 以厘秒为单位
 	uint32_t starttime;			// 当前 skynet 的启动系统时间, 以秒为单位; 只有当 current 超过 0xffffffff 的时候, starttime 才会改变
 	uint64_t current_point;		// 记录当前的运行时间, 以厘秒为单位
 	uint64_t origin_point;		// 记录 skynet 节点的启动运行时间, 以厘秒为单位
+=======
+	struct spinlock lock;
+	uint32_t time;
+	uint32_t current;
+	uint32_t starttime;
+	uint64_t current_point;
+	uint64_t origin_point;
+>>>>>>> cloudwu/master
 };
 
 static struct timer * TI = NULL;
@@ -147,14 +156,19 @@ add_node(struct timer * T, struct timer_node * node) {
 static void
 timer_add(struct timer * T, void *arg, size_t sz, int time) {
 
+<<<<<<< HEAD
 	// 分配 timer_node 的内存空间
 	// 注意! 这里多分配了 sz 的内存容量, 用来存储 arg 的数据
 	struct timer_node * node = (struct timer_node *)skynet_malloc(sizeof(*node) + sz);
+=======
+	SPIN_LOCK(T);
+>>>>>>> cloudwu/master
 
 	// 在 node 内存容量之后, 存储 arg 的数据,
 	// 注意, 这里对 arg 的数据进行了复制.
 	memcpy(node + 1, arg, sz);
 
+<<<<<<< HEAD
 	// 保证线程安全
 	SPIN_LOCK(T);
 
@@ -164,6 +178,8 @@ timer_add(struct timer * T, void *arg, size_t sz, int time) {
 	// 将 node 添加到 timer 中, 当 expire 为 0 时的特殊处理已经在 add_node 中添加了说明
 	add_node(T, node);
 
+=======
+>>>>>>> cloudwu/master
 	SPIN_UNLOCK(T);
 }
 
@@ -275,14 +291,22 @@ timer_execute(struct timer *T) {
 	while (T->near[idx].head.next) {
 		// 拿到链表头元素
 		struct timer_node *current = link_clear(&T->near[idx]);
+<<<<<<< HEAD
 
 		SPIN_UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
 
+=======
+		SPIN_UNLOCK(T);
+>>>>>>> cloudwu/master
 		// dispatch_list don't need lock T
 		// dispatch_list 函数不需要锁住 T
 		dispatch_list(current);
+<<<<<<< HEAD
 
 		SPIN_LOCK(T);		// !!! LOCK, 锁住, 后面要继续使用 T
+=======
+		SPIN_LOCK(T);
+>>>>>>> cloudwu/master
 	}
 }
 

@@ -7,6 +7,7 @@
 
 struct skynet_context;
 
+<<<<<<< HEAD
 #define SKYNET_SOCKET_TYPE_DATA 1       // tcp 接收到数据
 #define SKYNET_SOCKET_TYPE_CONNECT 2    // 与其他主机成功建立连接, 这时可以操作该 socket
 #define SKYNET_SOCKET_TYPE_CLOSE 3      // 关闭当前 socket 
@@ -14,6 +15,15 @@ struct skynet_context;
 #define SKYNET_SOCKET_TYPE_ERROR 5      // socket 出错, 已经无法使用
 #define SKYNET_SOCKET_TYPE_UDP 6        // udp 接收到数据
 #define SKYNET_SOCKET_TYPE_WARNING 7    // socket 相关的警告通知
+=======
+#define SKYNET_SOCKET_TYPE_DATA 1
+#define SKYNET_SOCKET_TYPE_CONNECT 2
+#define SKYNET_SOCKET_TYPE_CLOSE 3
+#define SKYNET_SOCKET_TYPE_ACCEPT 4
+#define SKYNET_SOCKET_TYPE_ERROR 5
+#define SKYNET_SOCKET_TYPE_UDP 6
+#define SKYNET_SOCKET_TYPE_WARNING 7
+>>>>>>> cloudwu/master
 
 /// skynet 与 socket_server 的数据转化, 一般是将 socket_message 的内容传给 skynet_socket_message
 struct skynet_socket_message {

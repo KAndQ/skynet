@@ -148,12 +148,21 @@ end
 
 local function default_warning(id, size)
 	local s = socket_pool[id]
+<<<<<<< HEAD
 	local last = s.warningsize or 0
 	if last + 64 < size then	-- if size increase 64K
 		s.warningsize = size
 		skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
 	end
 	s.warningsize = size
+=======
+		local last = s.warningsize or 0
+		if last + 64 < size then	-- if size increase 64K
+			s.warningsize = size
+			skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
+		end
+		s.warningsize = size
+>>>>>>> cloudwu/master
 end
 
 -- SKYNET_SOCKET_TYPE_WARNING
@@ -165,7 +174,10 @@ socket_message[7] = function(id, size)
 	end
 end
 
+<<<<<<< HEAD
 -- 注册 socket 消息类型
+=======
+>>>>>>> cloudwu/master
 skynet.register_protocol {
 	name = "socket",
 	id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6

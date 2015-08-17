@@ -12,10 +12,13 @@
 // 在整个 skynet 网络中节点名字的长度
 #define GLOBALNAME_LENGTH 16
 
+<<<<<<< HEAD
 // 整个 skynet 网络节点的数量
 #define REMOTE_MAX 256
 
 // 远程节点的数据结构
+=======
+>>>>>>> cloudwu/master
 struct remote_name {
 	char name[GLOBALNAME_LENGTH];  // skynet 节点的名字
 	uint32_t handle;               // handle 
