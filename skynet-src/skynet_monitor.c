@@ -33,7 +33,12 @@ skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t dest
 	// 在发送消息前, 记录一次状态
 	sm->source = source;
 	sm->destination = destination;
+<<<<<<< HEAD
 	__sync_fetch_and_add(&sm->version, 1);
+=======
+
+	ATOM_INC(&sm->version);
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 }
 
 // check 函数和上面的 trigger 函数不是运行在同一个线程的

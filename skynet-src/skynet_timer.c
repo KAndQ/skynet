@@ -62,12 +62,22 @@ struct timer {
 	// t[2]: 表示第三个数量级, [0x100000, 0x3FFFFFF];
 	// t[3]: 表示第四个数量级, [0x4000000, 0xFFFFFFFF];
 	struct link_list t[4][TIME_LEVEL];
+<<<<<<< HEAD
 	int lock;							// 线程安全锁
 	uint32_t time;						// 不断累加的计时计数, 可以理解为以厘秒为单位
 	uint32_t current;					// 从 skynet 节点的启动系统时间开始, 每次 update 都会更新一次, 以厘秒为单位
 	uint32_t starttime;					// 当前 skynet 的启动系统时间, 以秒为单位; 只有当 current 超过 0xffffffff 的时候, starttime 才会改变
 	uint64_t current_point;				// 记录当前的运行时间, 以厘秒为单位
 	uint64_t origin_point;				// 记录 skynet 节点的启动运行时间, 以厘秒为单位
+=======
+
+	struct spinlock lock;		// 线程安全锁
+	uint32_t time;				// 不断累加的计时计数, 可以理解为以厘秒为单位
+	uint32_t current;			// 从 skynet 节点的启动系统时间开始, 每次 update 都会更新一次, 以厘秒为单位
+	uint32_t starttime;			// 当前 skynet 的启动系统时间, 以秒为单位; 只有当 current 超过 0xffffffff 的时候, starttime 才会改变
+	uint64_t current_point;		// 记录当前的运行时间, 以厘秒为单位
+	uint64_t origin_point;		// 记录 skynet 节点的启动运行时间, 以厘秒为单位
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 };
 
 static struct timer * TI = NULL;
@@ -280,8 +290,13 @@ timer_execute(struct timer *T) {
 		// 拿到链表头元素
 		struct timer_node * current = link_clear(&T->near[idx]);
 
+<<<<<<< HEAD
 		UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
 
+=======
+		SPIN_UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
+		
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 		// dispatch_list don't need lock T
 		// dispatch_list 函数不需要锁住 T
 		dispatch_list(current);
