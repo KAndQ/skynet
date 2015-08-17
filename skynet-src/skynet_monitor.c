@@ -34,6 +34,7 @@ skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t dest
 	// 在发送消息前, 记录一次状态
 	sm->source = source;
 	sm->destination = destination;
+
 	ATOM_INC(&sm->version);
 }
 

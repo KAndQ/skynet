@@ -6,6 +6,7 @@
 #define SKYNET_SPINLOCK_H
 
 /* 宏定义公共接口 */
+
 #define SPIN_INIT(q) spinlock_init(&(q)->lock);
 #define SPIN_LOCK(q) spinlock_lock(&(q)->lock);
 #define SPIN_UNLOCK(q) spinlock_unlock(&(q)->lock);
