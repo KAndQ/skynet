@@ -146,6 +146,7 @@ socket_message[6] = function(id, size, data, address)
 	s.callback(str, address)
 end
 
+<<<<<<< HEAD
 local function default_warning(id, size)
 	local s = socket_pool[id]
 <<<<<<< HEAD
@@ -182,6 +183,8 @@ end
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+=======
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 -- 注册 socket 消息类型
 =======
 >>>>>>> cloudwu/master
@@ -478,11 +481,5 @@ end
 
 socket.sendto = assert(driver.udp_send)
 socket.udp_address = assert(driver.udp_address)
-
-function socket.warning(id, callback)
-	local obj = socket_pool[id]
-	assert(obj)
-	obj.warning = callback
-end
 
 return socket

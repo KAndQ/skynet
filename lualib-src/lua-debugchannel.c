@@ -4,9 +4,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include "spinlock.h"
 
 #define METANAME "debugchannel"
+#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
+#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 struct command {
 	struct command * next;
@@ -14,7 +15,7 @@ struct command {
 };
 
 struct channel {
-	struct spinlock lock;
+	int lock;
 	int ref;
 	struct command * head;
 	struct command * tail;
@@ -25,7 +26,6 @@ channel_new() {
 	struct channel * c = malloc(sizeof(*c));
 	memset(c, 0 , sizeof(*c));
 	c->ref = 1;
-	SPIN_INIT(c)
 
 	return c;
 }
@@ -33,21 +33,21 @@ channel_new() {
 static struct channel *
 channel_connect(struct channel *c) {
 	struct channel * ret = NULL;
-	SPIN_LOCK(c)
+	LOCK(c)
 	if (c->ref == 1) {
 		++c->ref;
 		ret = c;
 	}
-	SPIN_UNLOCK(c)
+	UNLOCK(c)
 	return ret;
 }
 
 static struct channel *
 channel_release(struct channel *c) {
-	SPIN_LOCK(c)
+	LOCK(c)
 	--c->ref;
 	if (c->ref > 0) {
-		SPIN_UNLOCK(c)
+		UNLOCK(c)
 		return c;
 	}
 	// never unlock while reference is 0
@@ -59,8 +59,6 @@ channel_release(struct channel *c) {
 		free(p);
 		p = next;
 	}
-	SPIN_UNLOCK(c)
-	SPIN_DESTROY(c)
 	free(c);
 	return NULL;
 }
@@ -69,9 +67,9 @@ channel_release(struct channel *c) {
 static struct command *
 channel_read(struct channel *c, double timeout) {
 	struct command * ret = NULL;
-	SPIN_LOCK(c)
+	LOCK(c)
 	if (c->head == NULL) {
-		SPIN_UNLOCK(c)
+		UNLOCK(c)
 		int ti = (int)(timeout * 100000);
 		usleep(ti);
 		return NULL;
@@ -81,7 +79,7 @@ channel_read(struct channel *c, double timeout) {
 	if (c->head == NULL) {
 		c->tail = NULL;
 	}
-	SPIN_UNLOCK(c)
+	UNLOCK(c)
 	
 	return ret;
 }
@@ -92,14 +90,14 @@ channel_write(struct channel *c, const char * s, size_t sz) {
 	cmd->sz = sz;
 	cmd->next = NULL;
 	memcpy(cmd+1, s, sz);
-	SPIN_LOCK(c)
+	LOCK(c)
 	if (c->tail == NULL) {
 		c->head = c->tail = cmd;
 	} else {
 		c->tail->next = cmd;
 		c->tail = cmd;
 	}
-	SPIN_UNLOCK(c)
+	UNLOCK(c)
 }
 
 struct channel_box {

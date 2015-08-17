@@ -114,12 +114,6 @@ function gateserver.start(handler)
 		close_fd(fd)
 	end
 
-	function MSG.warning(fd, size)
-		if handler.warning then
-			handler.warning(fd, size)
-		end
-	end
-
 	skynet.register_protocol {
 		name = "socket",
 		id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6

@@ -18,6 +18,10 @@ void
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+	
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 	// 获得当前发送消息的类型, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
 	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
 

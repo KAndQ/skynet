@@ -14,7 +14,11 @@
 // reserve high 8 bits for remote id
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 // 保留高 8 位用来存储远程节点的 id
+=======
+// 高 8 位用来存储远程节点的 id
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 #define HANDLE_MASK 0xffffff        // 用于计算 handle 的值
 
  // 计算 handle 时的位偏移量

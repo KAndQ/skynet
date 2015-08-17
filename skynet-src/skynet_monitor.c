@@ -3,7 +3,6 @@
 #include "skynet_monitor.h"
 #include "skynet_server.h"
 #include "skynet.h"
-#include "atomic.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -34,8 +33,7 @@ skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t dest
 	// 在发送消息前, 记录一次状态
 	sm->source = source;
 	sm->destination = destination;
-
-	ATOM_INC(&sm->version);
+	__sync_fetch_and_add(&sm->version, 1);
 }
 
 // check 函数和上面的 trigger 函数不是运行在同一个线程的

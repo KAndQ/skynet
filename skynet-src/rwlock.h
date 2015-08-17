@@ -1,10 +1,13 @@
 #ifndef SKYNET_RWLOCK_H
 #define SKYNET_RWLOCK_H
 
+<<<<<<< HEAD
 #ifndef USE_PTHREAD_LOCK
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+=======
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 // 读写锁的数据结构, 这个 <读> 锁可以嵌套, 但是 [写] 锁不能嵌套.
 =======
 >>>>>>> cloudwu/master
@@ -85,43 +88,5 @@ static inline void
 rwlock_runlock(struct rwlock *lock) {
 	__sync_sub_and_fetch(&lock->read,1);
 }
-
-#else
-
-#include <pthread.h>
-
-// only for some platform doesn't have __sync_*
-// todo: check the result of pthread api
-
-struct rwlock {
-	pthread_rwlock_t lock;
-};
-
-static inline void
-rwlock_init(struct rwlock *lock) {
-	pthread_rwlock_init(&lock->lock, NULL);
-}
-
-static inline void
-rwlock_rlock(struct rwlock *lock) {
-	 pthread_rwlock_rdlock(&lock->lock);
-}
-
-static inline void
-rwlock_wlock(struct rwlock *lock) {
-	 pthread_rwlock_wrlock(&lock->lock);
-}
-
-static inline void
-rwlock_wunlock(struct rwlock *lock) {
-	pthread_rwlock_unlock(&lock->lock);
-}
-
-static inline void
-rwlock_runlock(struct rwlock *lock) {
-	pthread_rwlock_unlock(&lock->lock);
-}
-
-#endif
 
 #endif

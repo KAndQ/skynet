@@ -10,8 +10,6 @@
 #include "skynet_monitor.h"
 #include "skynet_imp.h"
 #include "skynet_log.h"
-#include "spinlock.h"
-#include "atomic.h"
 
 // POSIX线程（POSIX threads），简称 pthreads，是线程的 POSIX 标准。该标准定义了创建和操纵线程的一整套API。
 // 在类Unix操作系统（Unix、Linux、Mac OS X等）中，都使用 pthreads 作为操作系统的线程。
@@ -27,18 +25,16 @@
 
 #ifdef CALLING_CHECK
 
-#define CHECKCALLING_BEGIN(ctx) if (!(spinlock_trylock(&ctx->calling))) { assert(0); }
-#define CHECKCALLING_END(ctx) spinlock_unlock(&ctx->calling);
-#define CHECKCALLING_INIT(ctx) spinlock_init(&ctx->calling);
-#define CHECKCALLING_DESTROY(ctx) spinlock_destroy(&ctx->calling);
-#define CHECKCALLING_DECL struct spinlock calling;
+#define CHECKCALLING_BEGIN(ctx) assert(__sync_lock_test_and_set(&ctx->calling,1) == 0);
+#define CHECKCALLING_END(ctx) __sync_lock_release(&ctx->calling);
+#define CHECKCALLING_INIT(ctx) ctx->calling = 0;
+#define CHECKCALLING_DECL int calling;
 
 #else
 
 #define CHECKCALLING_BEGIN(ctx)
 #define CHECKCALLING_END(ctx)
 #define CHECKCALLING_INIT(ctx)
-#define CHECKCALLING_DESTROY(ctx)
 #define CHECKCALLING_DECL
 
 #endif
@@ -87,13 +83,13 @@ skynet_context_total() {
 // G_NODE.total 计数加 1
 static void
 context_inc() {
-	ATOM_INC(&G_NODE.total);
+	__sync_fetch_and_add(&G_NODE.total, 1);
 }
 
 // G_NODE.total 计数减 1
 static void
 context_dec() {
-	ATOM_DEC(&G_NODE.total);
+	__sync_fetch_and_sub(&G_NODE.total, 1);
 }
 
 uint32_t 
@@ -236,11 +232,15 @@ skynet_context_grab(struct skynet_context *ctx) {
 <<<<<<< HEAD
 <<<<<<< HEAD
 	// ctx 的引用 +1
+<<<<<<< HEAD
 =======
 >>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	ATOM_INC(&ctx->ref);
+=======
+	__sync_add_and_fetch(&ctx->ref,1);
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 }
 
 void
@@ -272,8 +272,6 @@ delete_context(struct skynet_context *ctx) {
 <<<<<<< HEAD
 <<<<<<< HEAD
 
-	CHECKCALLING_DESTROY(ctx)
-
 	// 释放内存资源
 =======
 	CHECKCALLING_DESTROY(ctx)
@@ -291,12 +289,18 @@ struct skynet_context *
 skynet_context_release(struct skynet_context *ctx) {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 引用计数为 0 的时候, 自动释放掉 ctx
 =======
 >>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	if (ATOM_DEC(&ctx->ref) == 0) {
+=======
+
+	// 引用计数为 0 的时候, 自动释放掉 ctx
+	if (__sync_sub_and_fetch(&ctx->ref, 1) == 0) {
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 		delete_context(ctx);
 		return NULL;
 	}
@@ -822,7 +826,8 @@ cmd_logon(struct skynet_context * context, const char * param) {
 		// 打开 handle 对应的 skynet_context 的日志文件
 		f = skynet_log_open(context, handle);
 		if (f) {
-			if (!ATOM_CAS_POINTER(&ctx->logfile, NULL, f)) {
+			// __sync_bool_compare_and_swap: 如果第 1 个参数和第 2 个参数值相等, 那么把第 3 个参数的值赋给第 1 个参数.
+			if (!__sync_bool_compare_and_swap(&ctx->logfile, NULL, f)) {
 				// logfile opens in other thread, close this one.
 				// 如果日志文件已经被其他线程打开了, 那么关闭掉当前的.
 				fclose(f);
@@ -854,11 +859,15 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 <<<<<<< HEAD
 <<<<<<< HEAD
 		// 日志文件可能在其他线程被关掉
+<<<<<<< HEAD
 =======
 >>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 		if (ATOM_CAS_POINTER(&ctx->logfile, f, NULL)) {
+=======
+		if (__sync_bool_compare_and_swap(&ctx->logfile, f, NULL)) {
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 			skynet_log_close(context, f, handle);
 		}
 	}
@@ -970,6 +979,10 @@ int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+	
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 	// 数据大小的判断
 =======
 >>>>>>> cloudwu/master

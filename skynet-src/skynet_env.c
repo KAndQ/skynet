@@ -1,6 +1,5 @@
 #include "skynet.h"
 #include "skynet_env.h"
-#include "spinlock.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -15,7 +14,11 @@
 struct skynet_env {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	struct spinlock lock;		// 简单的多线程锁
+=======
+	int lock;		// 简单的多线程锁
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 	lua_State *L;	// lua 沙箱
 =======
 =======
@@ -27,9 +30,17 @@ struct skynet_env {
 
 static struct skynet_env *E = NULL;
 
+// 上锁
+#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
+
+// 解锁
+#define UNLOCK(q) __sync_lock_release(&(q)->lock);
+
 const char * 
 skynet_getenv(const char *key) {
-	SPIN_LOCK(E)
+
+	// 保证线程的安全
+	LOCK(E)
 
 	lua_State *L = E->L;
 	
@@ -37,14 +48,14 @@ skynet_getenv(const char *key) {
 	const char * result = lua_tostring(L, -1);
 	lua_pop(L, 1);
 
-	SPIN_UNLOCK(E)
+	UNLOCK(E)
 
 	return result;
 }
 
 void 
 skynet_setenv(const char *key, const char *value) {
-	SPIN_LOCK(E)
+	LOCK(E)
 	
 	lua_State *L = E->L;
 	lua_getglobal(L, key);
@@ -53,12 +64,12 @@ skynet_setenv(const char *key, const char *value) {
 	lua_pushstring(L,value);
 	lua_setglobal(L,key);
 
-	SPIN_UNLOCK(E)
+	UNLOCK(E)
 }
 
 void
 skynet_env_init() {
 	E = skynet_malloc(sizeof(*E));
-	SPIN_INIT(E)
+	E->lock = 0;
 	E->L = luaL_newstate();
 }

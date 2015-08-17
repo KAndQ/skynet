@@ -1,7 +1,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "skynet.h"
 
@@ -28,8 +27,11 @@ fill_uint32(uint8_t * buf, uint32_t n) {
 }
 
 static void
-fill_header(lua_State *L, uint8_t *buf, int sz) {
-	assert(sz < 0x10000);
+fill_header(lua_State *L, uint8_t *buf, int sz, void *msg) {
+	if (sz >= 0x10000) {
+		skynet_free(msg);
+		luaL_error(L, "request message is too long %d", sz);
+	}
 	buf[0] = (sz >> 8) & 0xff;
 	buf[1] = sz & 0xff;
 }
@@ -75,7 +77,7 @@ packreq_number(lua_State *L, int session, void * msg, uint32_t sz) {
 	uint32_t addr = (uint32_t)lua_tointeger(L,1);
 	uint8_t buf[TEMP_LENGTH];
 	if (sz < MULTI_PART) {
-		fill_header(L, buf, sz+9);
+		fill_header(L, buf, sz+9, msg);
 		buf[2] = 0;
 		fill_uint32(buf+3, addr);
 		fill_uint32(buf+7, (uint32_t)session);
@@ -85,7 +87,7 @@ packreq_number(lua_State *L, int session, void * msg, uint32_t sz) {
 		return 0;
 	} else {
 		int part = (sz - 1) / MULTI_PART + 1;
-		fill_header(L, buf, 13);
+		fill_header(L, buf, 13, msg);
 		buf[2] = 1;
 		fill_uint32(buf+3, addr);
 		fill_uint32(buf+7, (uint32_t)session);
@@ -106,22 +108,24 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 
 	uint8_t buf[TEMP_LENGTH];
 	if (sz < MULTI_PART) {
-		fill_header(L, buf, sz+6+namelen);
+		fill_header(L, buf, sz+6+namelen, msg);
 		buf[2] = 0x80;
 		buf[3] = (uint8_t)namelen;
 		memcpy(buf+4, name, namelen);
 		fill_uint32(buf+4+namelen, (uint32_t)session);
 		memcpy(buf+8+namelen,msg,sz);
+
 		lua_pushlstring(L, (const char *)buf, sz+8+namelen);
 		return 0;
 	} else {
 		int part = (sz - 1) / MULTI_PART + 1;
-		fill_header(L, buf, 10+namelen);
+		fill_header(L, buf, 10+namelen, msg);
 		buf[2] = 0x81;
 		buf[3] = (uint8_t)namelen;
 		memcpy(buf+4, name, namelen);
 		fill_uint32(buf+4+namelen, (uint32_t)session);
 		fill_uint32(buf+8+namelen, sz);
+
 		lua_pushlstring(L, (const char *)buf, 12+namelen);
 		return part;
 	}
@@ -142,7 +146,7 @@ packreq_multi(lua_State *L, int session, void * msg, uint32_t sz) {
 			s = sz;
 			buf[2] = 3;	// the last multi part
 		}
-		fill_header(L, buf, s+5);
+		fill_header(L, buf, s+5, msg);
 		fill_uint32(buf+3, (uint32_t)session);
 		memcpy(buf+7, ptr, s);
 		lua_pushlstring(L, (const char *)buf, s+7);
@@ -217,8 +221,8 @@ unpackreq_number(lua_State *L, const uint8_t * buf, int sz) {
 
 static int
 unpackmreq_number(lua_State *L, const uint8_t * buf, int sz) {
-	if (sz != 13) {
-		return luaL_error(L, "Invalid cluster message size %d (multi req must be 13)", sz);
+	if (sz != 15) {
+		return luaL_error(L, "Invalid cluster message size %d (multi req must be 15)", sz);
 	}
 	uint32_t address = unpack_uint32(buf+1);
 	uint32_t session = unpack_uint32(buf+5);
@@ -354,7 +358,7 @@ lpackresponse(lua_State *L) {
 			uint8_t buf[TEMP_LENGTH];
 
 			// multi part begin
-			fill_header(L, buf, 9);
+			fill_header(L, buf, 9, msg);
 			fill_uint32(buf+2, session);
 			buf[6] = 2;
 			fill_uint32(buf+7, (uint32_t)sz);
@@ -372,7 +376,7 @@ lpackresponse(lua_State *L) {
 					s = sz;
 					buf[6] = 4;
 				}
-				fill_header(L, buf, s+5);
+				fill_header(L, buf, s+5, msg);
 				fill_uint32(buf+2, session);
 				memcpy(buf+7,ptr,s);
 				lua_pushlstring(L, (const char *)buf, s+7);
@@ -385,7 +389,7 @@ lpackresponse(lua_State *L) {
 	}
 
 	uint8_t buf[TEMP_LENGTH];
-	fill_header(L, buf, sz+5);
+	fill_header(L, buf, sz+5, msg);
 	fill_uint32(buf+2, session);
 	buf[6] = ok;
 	memcpy(buf+7,msg,sz);

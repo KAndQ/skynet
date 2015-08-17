@@ -1,7 +1,6 @@
 #include "skynet.h"
 #include "skynet_mq.h"
 #include "skynet_handle.h"
-#include "spinlock.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,15 +24,19 @@
 struct message_queue {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	struct spinlock lock;	// 线程安全锁
+=======
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 	uint32_t handle;	// 关联 skynet_context 的 handle
-	int cap;	// 当前能存放消息的最大容量
-	int head;	// 队列头部的索引
-	int tail;	// 队列尾部的索引
-	int release;	// 队列资源释放标记, 0 标记未释放, 1 标记为释放
-	int in_global;	// 是否压入到 global_queue 中
-	int overload;	// 当前持有 skynet_message 的数量, 只有在超载时才会被赋值
-	int overload_threshold;	// 超载的阈值, 每次超载发生的时候, 该阈值也会增大 2 倍
+	int cap;			// 当前能存放消息的最大容量
+	int head;			// 队列头部的索引
+	int tail;			// 队列尾部的索引
+	int lock;			// 线程安全锁
+	int release;		// 队列资源释放标记, 0 标记未释放, 1 标记为释放
+	int in_global;		// 是否压入到 global_queue 中
+	int overload;				// 当前持有 skynet_message 的数量, 只有在超载时才会被赋值
+	int overload_threshold;		// 超载的阈值, 每次超载发生的时候, 该阈值也会增大 2 倍
 	struct skynet_message *queue;	// skynet_message 的数组
 	struct message_queue *next;		// 当压入到全局队列的时候, 关联的下一个 message_queue
 =======
@@ -58,6 +61,7 @@ struct global_queue {
 <<<<<<< HEAD
 	struct message_queue *head;		// 队列的首指针
 	struct message_queue *tail;		// 队列的尾指针
+<<<<<<< HEAD
 	struct spinlock lock;		// 线程的安全锁
 =======
 	struct message_queue *head;
@@ -67,16 +71,23 @@ struct global_queue {
 >>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
+=======
+	int lock;		// 线程的安全锁
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 };
 
 static struct global_queue *Q = NULL;
+
+// 保证线程安全的一些处理
+#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
+#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 void 
 skynet_globalmq_push(struct message_queue * queue) {
 	struct global_queue *q = Q;
 
 	// 保证线程安全
-	SPIN_LOCK(q)
+	LOCK(q)
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -101,11 +112,15 @@ skynet_globalmq_push(struct message_queue * queue) {
 <<<<<<< HEAD
 <<<<<<< HEAD
 
+<<<<<<< HEAD
 =======
 >>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_UNLOCK(q)
+=======
+	UNLOCK(q)
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 }
 
 struct message_queue * 
@@ -115,7 +130,7 @@ skynet_globalmq_pop() {
 <<<<<<< HEAD
 <<<<<<< HEAD
 	// 保证线程安全
-	SPIN_LOCK(q)
+	LOCK(q)
 
 =======
 	SPIN_LOCK(q)
@@ -142,7 +157,7 @@ skynet_globalmq_pop() {
 		// 保证 mq 已经不在链表中
 		mq->next = NULL;
 	}
-	SPIN_UNLOCK(q)
+	UNLOCK(q)
 
 	return mq;
 }
@@ -154,7 +169,7 @@ skynet_mq_create(uint32_t handle) {
 	q->cap = DEFAULT_QUEUE_SIZE;
 	q->head = 0;
 	q->tail = 0;
-	SPIN_INIT(q)
+	q->lock = 0;
 	// When the queue is create (always between service create and service init) ,
 	// set in_global flag to avoid push it to global queue .
 	// If the service init success, skynet_context_new will call skynet_mq_force_push to push it to global queue.
@@ -178,8 +193,6 @@ _release(struct message_queue *q) {
 <<<<<<< HEAD
 <<<<<<< HEAD
 
-	SPIN_DESTROY(q)
-
 	// 释放资源
 =======
 	SPIN_DESTROY(q)
@@ -200,11 +213,11 @@ int
 skynet_mq_length(struct message_queue *q) {
 	int head, tail, cap;
 
-	SPIN_LOCK(q)
+	LOCK(q)
 	head = q->head;
 	tail = q->tail;
 	cap = q->cap;
-	SPIN_UNLOCK(q)
+	UNLOCK(q)
 	
 	// 计算长度
 	if (head <= tail) {
@@ -236,9 +249,13 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 >>>>>>> cloudwu/master
 
 	// 保证线程安全
+<<<<<<< HEAD
 =======
 >>>>>>> cloudwu/master
 	SPIN_LOCK(q)
+=======
+	LOCK(q)
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 
 	// 保证 q 不是空队列
 	if (q->head != q->tail) {
@@ -280,7 +297,7 @@ skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 		q->in_global = 0;
 	}
 	
-	SPIN_UNLOCK(q)
+	UNLOCK(q)
 
 	return ret;
 }
@@ -316,9 +333,13 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 >>>>>>> cloudwu/master
 
 	// 保证线程安全
+<<<<<<< HEAD
 =======
 >>>>>>> cloudwu/master
 	SPIN_LOCK(q)
+=======
+	LOCK(q)
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 
 	// 将 message 压入队尾
 	// 注意, 这里是赋值!!!
@@ -341,7 +362,7 @@ skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 		skynet_globalmq_push(q);
 	}
 	
-	SPIN_UNLOCK(q)
+	UNLOCK(q)
 }
 
 void 
@@ -349,9 +370,11 @@ skynet_mq_init() {
 	// 初始化 global_queue
 	struct global_queue *q = skynet_malloc(sizeof(*q));
 <<<<<<< HEAD
+<<<<<<< HEAD
 
+=======
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 	memset(q, 0, sizeof(*q));
-	SPIN_INIT(q);
 	Q = q;
 =======
 	memset(q,0,sizeof(*q));
@@ -364,8 +387,12 @@ void
 skynet_mq_mark_release(struct message_queue *q) {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 	// 保证线程安全
-	SPIN_LOCK(q)
+	LOCK(q)
 
 	// 之前没有被标记为释放
 =======
@@ -386,11 +413,15 @@ skynet_mq_mark_release(struct message_queue *q) {
 <<<<<<< HEAD
 <<<<<<< HEAD
 
+<<<<<<< HEAD
 =======
 >>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_UNLOCK(q)
+=======
+	UNLOCK(q)
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 }
 
 /**
@@ -416,21 +447,27 @@ void
 skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 保证线程安全
 =======
 >>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_LOCK(q)
+=======
+
+	// 保证线程安全
+	LOCK(q)
+>>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
 	
 	// 如果 q 已经标记了需要释放, 那么将释放掉 q 所有相关联的资源
 	if (q->release) {
-		SPIN_UNLOCK(q)
+		UNLOCK(q)
 		_drop_queue(q, drop_func, ud);
 
 	// 如果 q 没有标记需要释放, 只将 q 压入到 global_queue 中去
 	} else {
 		skynet_globalmq_push(q);
-		SPIN_UNLOCK(q)
+		UNLOCK(q)
 	}
 }
