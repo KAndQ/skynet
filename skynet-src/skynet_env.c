@@ -1,5 +1,6 @@
 #include "skynet.h"
 #include "skynet_env.h"
+#include "spinlock.h"
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -12,23 +13,15 @@
 #include <assert.h>
 
 struct skynet_env {
-	int lock;		// 简单的多线程锁
+	struct spinlock lock;		// 简单的多线程锁
 	lua_State *L;	// lua 沙箱
 };
 
 static struct skynet_env *E = NULL;
 
-// 上锁
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-
-// 解锁
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
-
 const char * 
 skynet_getenv(const char *key) {
-
-	// 保证线程的安全
-	LOCK(E)
+	SPIN_LOCK(E)
 
 	lua_State *L = E->L;
 	
@@ -36,14 +29,14 @@ skynet_getenv(const char *key) {
 	const char * result = lua_tostring(L, -1);
 	lua_pop(L, 1);
 
-	UNLOCK(E)
+	SPIN_UNLOCK(E)
 
 	return result;
 }
 
 void 
 skynet_setenv(const char *key, const char *value) {
-	LOCK(E)
+	SPIN_LOCK(E)
 	
 	lua_State *L = E->L;
 	lua_getglobal(L, key);
@@ -52,12 +45,12 @@ skynet_setenv(const char *key, const char *value) {
 	lua_pushstring(L,value);
 	lua_setglobal(L,key);
 
-	UNLOCK(E)
+	SPIN_UNLOCK(E)
 }
 
 void
 skynet_env_init() {
 	E = skynet_malloc(sizeof(*E));
-	E->lock = 0;
+	SPIN_INIT(E)
 	E->L = luaL_newstate();
 }

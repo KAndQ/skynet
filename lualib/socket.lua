@@ -146,6 +146,25 @@ socket_message[6] = function(id, size, data, address)
 	s.callback(str, address)
 end
 
+local function default_warning(id, size)
+	local s = socket_pool[id]
+	local last = s.warningsize or 0
+	if last + 64 < size then	-- if size increase 64K
+		s.warningsize = size
+		skynet.error(string.format("WARNING: %d K bytes need to send out (fd = %d)", size, id))
+	end
+	s.warningsize = size
+end
+
+-- SKYNET_SOCKET_TYPE_WARNING
+socket_message[7] = function(id, size)
+	local s = socket_pool[id]
+	if s then
+		local warning = s.warning or default_warning
+		warning(id, size)
+	end
+end
+
 -- 注册 socket 消息类型
 skynet.register_protocol {
 	name = "socket",
@@ -438,5 +457,11 @@ end
 
 socket.sendto = assert(driver.udp_send)
 socket.udp_address = assert(driver.udp_address)
+
+function socket.warning(id, callback)
+	local obj = socket_pool[id]
+	assert(obj)
+	obj.warning = callback
+end
 
 return socket

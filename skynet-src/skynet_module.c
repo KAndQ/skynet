@@ -1,6 +1,7 @@
 #include "skynet.h"
 
 #include "skynet_module.h"
+#include "spinlock.h"
 
 #include <assert.h>
 #include <string.h>
@@ -17,8 +18,8 @@
 #define MAX_MODULE_TYPE 32
 
 struct modules {
-	int count;		// 统计当前模块的数量
-	int lock;		// 简单的多线程锁, 不能嵌套
+	int count;	// 统计当前模块的数量
+	struct spinlock lock;	// 多线程锁
 	const char * path;	// 模块的搜索路径
 	struct skynet_module m[MAX_MODULE_TYPE];	// skynet_module 数组
 };
@@ -165,9 +166,9 @@ skynet_module_query(const char * name) {
 		return result;
 
 	// 如果没有加载, 保证线程的安全性
-	while(__sync_lock_test_and_set(&M->lock,1)) {}
+	SPIN_LOCK(M)
 
-	// 再查询一次, 判断是否其他线程有加载这个模块
+	// 再查询一次, 判断是否其他线程又加载这个模块, 因为有可能在运行上次查询和上锁之间的那段代码之间已经加载了模块
 	result = _query(name); // double check
 	
 	// 保证空间足够, 创建 skynet_module, 并加入到集合中
@@ -186,16 +187,15 @@ skynet_module_query(const char * name) {
 		}
 	}
 
-	__sync_lock_release(&M->lock);
+	SPIN_UNLOCK(M)
 
 	return result;
 }
 
 void 
 skynet_module_insert(struct skynet_module *mod) {
-
 	// 保证线程安全
-	while(__sync_lock_test_and_set(&M->lock,1)) {}
+	SPIN_LOCK(M)
 
 	// 保证 mod 之前并没有插入到集合中
 	struct skynet_module * m = _query(mod->name);
@@ -206,7 +206,7 @@ skynet_module_insert(struct skynet_module *mod) {
 	M->m[index] = *mod;
 	++M->count;
 
-	__sync_lock_release(&M->lock);
+	SPIN_UNLOCK(M)
 }
 
 void * 
@@ -242,7 +242,8 @@ skynet_module_init(const char *path) {
 	struct modules *m = skynet_malloc(sizeof(*m));
 	m->count = 0;
 	m->path = skynet_strdup(path);
-	m->lock = 0;
+
+	SPIN_INIT(m)
 
 	M = m;
 }
