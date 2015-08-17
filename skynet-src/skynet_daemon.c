@@ -95,7 +95,7 @@ write_pid(const char *pidfile) {
 	}
 	
 	pid = getpid();
-	int ret = fprintf(f, "%d\n", pid)
+	int ret = fprintf(f, "%d\n", pid);
 	if (ret == 0 && ret == -1) {
 		fprintf(stderr, "Can't write pid.\n");
 		close(fd);
