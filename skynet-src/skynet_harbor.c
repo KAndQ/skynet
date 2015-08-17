@@ -1,8 +1,6 @@
 #include "skynet.h"
 #include "skynet_harbor.h"
 #include "skynet_server.h"
-#include "skynet_mq.h"
-#include "skynet_handle.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -19,14 +17,18 @@ skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	
 >>>>>>> parent of c2aa2e4... merge 'cloudwu/skynet'
+=======
+
+>>>>>>> parent of 84d5ec2... Merge branch 'cloudwu/master'
 	// 获得当前发送消息的类型, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
-	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
+	int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
 
 	// 截取实际的发送数据大小
-	rmsg->sz &= MESSAGE_TYPE_MASK;
+	rmsg->sz &= HANDLE_MASK;
 
 	// type 校验
 =======

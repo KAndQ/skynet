@@ -386,8 +386,7 @@ end
 
 local function _recv_decode_packet_resp(self)
      return function(sock)
-		-- don't return more than 2 results
-        return true, (_recv_packet(self,sock))
+        return true, _recv_packet(self,sock)
     end
 end
 

@@ -367,10 +367,10 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 <<<<<<< HEAD
 
 	// 拿到消息类型, 高 8 位存储
-	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
+	int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 
 	// 拿到数据的大小
-	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
+	size_t sz = msg->sz & HANDLE_MASK;
 
 	// 如果当前服务有日志文件, 将信息输出到日志文件中
 =======
@@ -968,6 +968,7 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 <<<<<<< HEAD
 <<<<<<< HEAD
 	// 高 8 位存储 PTYPE_*
+<<<<<<< HEAD
 =======
 >>>>>>> cloudwu/master
 =======
@@ -990,6 +991,16 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 >>>>>>> cloudwu/master
 	if ((sz & MESSAGE_TYPE_MASK) != sz) {
 		skynet_error(context, "The message to %x is too large", destination);
+=======
+	*sz |= type << HANDLE_REMOTE_SHIFT;
+}
+
+int
+skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination, int type, int session, void * data, size_t sz) {
+	// 数据大小的判断
+	if ((sz & HANDLE_MASK) != sz) {
+		skynet_error(context, "The message to %x is too large (sz = %lu)", destination, sz);
+>>>>>>> parent of 84d5ec2... Merge branch 'cloudwu/master'
 		skynet_free(data);
 		return -1;
 	}
@@ -1090,7 +1101,7 @@ skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t
 	smsg.source = source;
 	smsg.session = session;
 	smsg.data = msg;
-	smsg.sz = sz | (size_t)type << MESSAGE_TYPE_SHIFT;
+	smsg.sz = sz | type << HANDLE_REMOTE_SHIFT;
 
 	skynet_mq_push(ctx->queue, &smsg);
 }

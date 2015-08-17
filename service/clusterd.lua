@@ -9,9 +9,15 @@ local node_session = {}
 local command = {}
 
 local function read_response(sock)
+<<<<<<< HEAD
     local sz = socket.header(sock:read(2))
     local msg = sock:read(sz)
     return cluster.unpackresponse(msg)  -- session, ok, data, padding
+=======
+	local sz = socket.header(sock:read(2))
+	local msg = sock:read(sz)
+	return cluster.unpackresponse(msg)	-- session, ok, data
+>>>>>>> parent of 84d5ec2... Merge branch 'cloudwu/master'
 end
 
 local function open_channel(t, key)
@@ -62,14 +68,22 @@ function command.listen(source, addr, port)
 end
 
 local function send_request(source, node, addr, msg, sz)
+<<<<<<< HEAD
     local session = node_session[node] or 1
     -- msg is a local pointer, cluster.packrequest will free it
     local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
     node_session[node] = new_session
+=======
+	local session = node_session[node] or 1
+	-- msg is a local pointer, cluster.packrequest will free it
+	local request, new_session = cluster.packrequest(addr, session, msg, sz)
+	node_session[node] = new_session
+>>>>>>> parent of 84d5ec2... Merge branch 'cloudwu/master'
 
     -- node_channel[node] may yield or throw error
     local c = node_channel[node]
 
+<<<<<<< HEAD
     return c:request(request, session, padding)
 end
 
@@ -85,6 +99,19 @@ function command.req(...)
         skynet.error(msg)
         skynet.response()(false)
     end
+=======
+	return c:request(request, session)
+end
+
+function command.req(...)
+	local ok, msg, sz = pcall(send_request, ...)
+	if ok then
+		skynet.ret(msg, sz)
+	else
+		skynet.error(msg)
+		skynet.response()(false)
+	end
+>>>>>>> parent of 84d5ec2... Merge branch 'cloudwu/master'
 end
 
 local proxy = {}
@@ -112,9 +139,10 @@ function command.register(source, name, addr)
     skynet.error(string.format("Register [%s] :%08x", name, addr))
 end
 
-local large_request = {}
+local request_fd = {}
 
 function command.socket(source, subcmd, fd, msg)
+<<<<<<< HEAD
     if subcmd == "data" then
         local sz
         local addr, session, msg, padding = cluster.unpackrequest(msg)
@@ -171,6 +199,24 @@ function command.socket(source, subcmd, fd, msg)
         large_request = {}
         skynet.error(string.format("socket %s %d : %s", subcmd, fd, msg))
     end
+=======
+	if subcmd == "data" then
+		local addr, session, msg = cluster.unpackrequest(msg)
+		local ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg)
+		local response
+		if ok then
+			response = cluster.packresponse(session, true, msg, sz)
+		else
+			response = cluster.packresponse(session, false, msg)
+		end
+		socket.write(fd, response)
+	elseif subcmd == "open" then
+		skynet.error(string.format("socket accept from %s", msg))
+		skynet.call(source, "lua", "accept", fd)
+	else
+		skynet.error(string.format("socket %s %d : %s", subcmd, fd, msg))
+	end
+>>>>>>> parent of 84d5ec2... Merge branch 'cloudwu/master'
 end
 
 skynet.start(function()

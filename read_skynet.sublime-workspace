@@ -51,8 +51,8 @@
 	],
 	"file_history":
 	[
-		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/atomic.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socket.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/atomic.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/cluster2.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/spinlock.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_timer.c",

@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 
+<<<<<<< HEAD
 // reserve high 8 bits for remote id
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -29,6 +30,9 @@
 #define HANDLE_MASK 0xffffff
 >>>>>>> cloudwu/master
 #define HANDLE_REMOTE_SHIFT 24
+=======
+#include "skynet_harbor.h"
+>>>>>>> parent of 84d5ec2... Merge branch 'cloudwu/master'
 
 struct skynet_context;
 

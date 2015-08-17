@@ -70,7 +70,7 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 	}
 	smsg.session = 0;
 	smsg.data = data;
-	smsg.sz = len | ((size_t)PTYPE_TEXT << MESSAGE_TYPE_SHIFT);
+	smsg.sz = len | (PTYPE_TEXT << HANDLE_REMOTE_SHIFT);
 	skynet_context_push(logger, &smsg);
 }
 

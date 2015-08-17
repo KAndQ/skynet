@@ -49,9 +49,7 @@ local function collect_all_uv(funcs)
 			collect_uv(v[4], global, envid(v[4]))
 		end
 	end
-	if not global["_ENV"] then
-		global["_ENV"] = {func = collect_uv, index = 1}
-	end
+
 	return global
 end
 
