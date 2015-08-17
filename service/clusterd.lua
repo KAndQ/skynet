@@ -9,15 +9,9 @@ local node_session = {}
 local command = {}
 
 local function read_response(sock)
-<<<<<<< HEAD
     local sz = socket.header(sock:read(2))
     local msg = sock:read(sz)
     return cluster.unpackresponse(msg)  -- session, ok, data, padding
-=======
-	local sz = socket.header(sock:read(2))
-	local msg = sock:read(sz)
-	return cluster.unpackresponse(msg)	-- session, ok, data, padding
->>>>>>> cloudwu/master
 end
 
 local function open_channel(t, key)
@@ -68,7 +62,6 @@ function command.listen(source, addr, port)
 end
 
 local function send_request(source, node, addr, msg, sz)
-<<<<<<< HEAD
     local session = node_session[node] or 1
     -- msg is a local pointer, cluster.packrequest will free it
     local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
@@ -76,16 +69,6 @@ local function send_request(source, node, addr, msg, sz)
 
     -- node_channel[node] may yield or throw error
     local c = node_channel[node]
-=======
-	local session = node_session[node] or 1
-	-- msg is a local pointer, cluster.packrequest will free it
-	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
-	node_session[node] = new_session
-
-	-- node_channel[node] may yield or throw error
-	local c = node_channel[node]
-
->>>>>>> cloudwu/master
 	return c:request(request, session, padding)
 end
 
@@ -128,24 +111,6 @@ function command.register(source, name, addr)
 	skynet.error(string.format("Register [%s] :%08x", name, addr))
 end
 
-<<<<<<< HEAD
-=======
-local register_name = {}
-
-function command.register(source, name, addr)
-	assert(register_name[name] == nil)
-	addr = addr or source
-	local old_name = register_name[addr]
-	if old_name then
-		register_name[old_name] = nil
-	end
-	register_name[addr] = name
-	register_name[name] = addr
-	skynet.ret(nil)
-	skynet.error(string.format("Register [%s] :%08x", name, addr))
-end
-
->>>>>>> cloudwu/master
 local large_request = {}
 
 function command.socket(source, subcmd, fd, msg)
