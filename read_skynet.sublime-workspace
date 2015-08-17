@@ -7,13 +7,6 @@
 	},
 	"buffers":
 	[
-		{
-			"settings":
-			{
-				"buffer_size": 0,
-				"line_ending": "Unix"
-			}
-		}
 	],
 	"build_system": "",
 	"build_system_choices":
@@ -52,8 +45,15 @@
 		"side_bar_visible": false,
 		"status_bar_visible": false
 	},
+	"expanded_folders":
+	[
+		"/Users/zhenyuyao/enhance/Source/read_skynet"
+	],
 	"file_history":
 	[
+		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/atomic.h",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socket.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/cluster2.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/spinlock.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_timer.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_monitor.c",
@@ -308,36 +308,8 @@
 	"groups":
 	[
 		{
-			"selected": 0,
 			"sheets":
 			[
-				{
-					"buffer": 0,
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 0,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								0,
-								0
-							]
-						],
-						"settings":
-						{
-							"syntax": "Packages/Text/Plain text.tmLanguage"
-						},
-						"translation.x": 0.0,
-						"translation.y": 0.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 0,
-					"type": "text"
-				}
 			]
 		}
 	],
