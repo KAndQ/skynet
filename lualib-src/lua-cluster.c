@@ -113,9 +113,12 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 		fill_uint32(buf+4+namelen, (uint32_t)session);
 		memcpy(buf+8+namelen,msg,sz);
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> cloudwu/master
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 		lua_pushlstring(L, (const char *)buf, sz+8+namelen);
 		return 0;
 	} else {
@@ -127,6 +130,7 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 		fill_uint32(buf+4+namelen, (uint32_t)session);
 		fill_uint32(buf+8+namelen, sz);
 <<<<<<< HEAD
+<<<<<<< HEAD
 		lua_pushlstring(L, (const char *)buf, 12+namelen);
 		return part;
 	}
@@ -134,6 +138,8 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 
 =======
 
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 		lua_pushlstring(L, (const char *)buf, 12+namelen);
 		return part;
 	}
