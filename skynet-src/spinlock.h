@@ -10,6 +10,7 @@
 /* 宏定义公共接口 */
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 #ifndef SKYNET_SPINLOCK_H
 #define SKYNET_SPINLOCK_H
@@ -22,6 +23,8 @@
 #define SKYNET_SPINLOCK_H
 
 >>>>>>> cloudwu/master
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 #define SPIN_INIT(q) spinlock_init(&(q)->lock);
 #define SPIN_LOCK(q) spinlock_lock(&(q)->lock);
 #define SPIN_UNLOCK(q) spinlock_unlock(&(q)->lock);

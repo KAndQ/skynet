@@ -62,6 +62,9 @@ struct timer {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 
@@ -310,6 +313,7 @@ timer_execute(struct timer *T) {
 		SPIN_UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
 		
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 		SPIN_UNLOCK(T);
 >>>>>>> cloudwu/master
@@ -318,6 +322,8 @@ timer_execute(struct timer *T) {
 =======
 		SPIN_UNLOCK(T);
 >>>>>>> cloudwu/master
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 		// dispatch_list don't need lock T
 		// dispatch_list 函数不需要锁住 T
 		dispatch_list(current);
