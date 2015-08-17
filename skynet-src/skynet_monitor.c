@@ -38,6 +38,7 @@ skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t dest
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> cloudwu/master
@@ -46,6 +47,9 @@ skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t dest
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> cloudwu/master
+=======
+
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'

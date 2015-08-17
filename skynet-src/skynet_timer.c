@@ -63,6 +63,9 @@ struct timer {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
@@ -314,6 +317,7 @@ timer_execute(struct timer *T) {
 		
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 		SPIN_UNLOCK(T);
 >>>>>>> cloudwu/master
@@ -322,6 +326,8 @@ timer_execute(struct timer *T) {
 =======
 		SPIN_UNLOCK(T);
 >>>>>>> cloudwu/master
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 		// dispatch_list don't need lock T
