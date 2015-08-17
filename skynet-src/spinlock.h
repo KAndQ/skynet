@@ -16,31 +16,31 @@
 
 /// 自定义自旋锁数据结构
 struct spinlock {
-	int lock;
+    int lock;
 };
 
 /// 初始化
 static inline void
 spinlock_init(struct spinlock *lock) {
-	lock->lock = 0;
+    lock->lock = 0;
 }
 
 /// 上锁
 static inline void
 spinlock_lock(struct spinlock *lock) {
-	while (__sync_lock_test_and_set(&lock->lock,1)) {}
+    while (__sync_lock_test_and_set(&lock->lock,1)) {}
 }
 
 /// 尝试获得锁, 如果成功获得锁返回 1, 否则返回 0
 static inline int
 spinlock_trylock(struct spinlock *lock) {
-	return __sync_lock_test_and_set(&lock->lock,1) == 0;
+    return __sync_lock_test_and_set(&lock->lock,1) == 0;
 }
 
 /// 解锁
 static inline void
 spinlock_unlock(struct spinlock *lock) {
-	__sync_lock_release(&lock->lock);
+    __sync_lock_release(&lock->lock);
 }
 
 /// 销毁锁
@@ -60,10 +60,10 @@ spinlock_destroy(struct spinlock *lock) {
 
 /*
 Pthreads提供了多种锁机制,常见的有：
-	1) Mutex（互斥量）：pthread_mutex_***
-	2) Spin lock（自旋锁）：pthread_spin_***
-	3) Condition Variable（条件变量）：pthread_con_***
-	4) Read/Write lock（读写锁）：pthread_rwlock_***
+    1) Mutex（互斥量）：pthread_mutex_***
+    2) Spin lock（自旋锁）：pthread_spin_***
+    3) Condition Variable（条件变量）：pthread_con_***
+    4) Read/Write lock（读写锁）：pthread_rwlock_***
 UNIX 环境高级编程, 11 章-线程-线程同步, 有介绍各个锁
 
 对于互斥量和自旋锁的性能分析, http://www.cnblogs.com/diyunpeng/archive/2011/06/07/2074059.html
@@ -72,32 +72,32 @@ UNIX 环境高级编程, 11 章-线程-线程同步, 有介绍各个锁
 // 以前接口的声明定义, 同上
 
 struct spinlock {
-	pthread_mutex_t lock;
+    pthread_mutex_t lock;
 };
 
 static inline void
 spinlock_init(struct spinlock *lock) {
-	pthread_mutex_init(&lock->lock, NULL);
+    pthread_mutex_init(&lock->lock, NULL);
 }
 
 static inline void
 spinlock_lock(struct spinlock *lock) {
-	pthread_mutex_lock(&lock->lock);
+    pthread_mutex_lock(&lock->lock);
 }
 
 static inline int
 spinlock_trylock(struct spinlock *lock) {
-	return pthread_mutex_trylock(&lock->lock) == 0;
+    return pthread_mutex_trylock(&lock->lock) == 0;
 }
 
 static inline void
 spinlock_unlock(struct spinlock *lock) {
-	pthread_mutex_unlock(&lock->lock);
+    pthread_mutex_unlock(&lock->lock);
 }
 
 static inline void
 spinlock_destroy(struct spinlock *lock) {
-	pthread_mutex_destroy(&lock->lock);
+    pthread_mutex_destroy(&lock->lock);
 }
 
 #endif
