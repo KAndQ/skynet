@@ -6,6 +6,7 @@
 
 #include "malloc_hook.h"
 #include "skynet.h"
+#include "atomic.h"
 
 // 当前内存使用的容量
 static size_t _used_memory = 0;
@@ -45,17 +46,15 @@ get_allocated_field(uint32_t handle) {
 
 	// 判断当前这个 handle 是否已经被占用, 或者是否已经分配了内存.
 	if(old_handle == 0 || old_alloc <= 0) {
-
-		// 将 handle 赋值给 data->handle, 并且成功之后, 才继续进行下面的处理.
-		if(!__sync_bool_compare_and_swap(&data->handle, old_handle, handle)) {
+		// data->allocated may less than zero, because it may not count at start.
+		// 译文: data->allocated 可能小于 0, 因为它可能在开始的时候没有计数.
+		if(!ATOM_CAS(&data->handle, old_handle, handle)) {
 			return 0;
 		}
 
-		// data->allocated may less than zero, because it may not count at start.
-		// 译文: data->allocated 可能小于 0, 因为它可能在开始的时候没有计数.
 		if (old_alloc < 0) {
 			// 保证其他线程没有对 data->allocated 做操作的时候, 设置 data->allocated 为 0.
-			__sync_bool_compare_and_swap(&data->allocated, old_alloc, 0);
+			ATOM_CAS(&data->allocated, old_alloc, 0);
 		}
 	}
 
@@ -74,17 +73,16 @@ get_allocated_field(uint32_t handle) {
  */
 inline static void 
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
-
 	// _used_memory += __n
-	__sync_add_and_fetch(&_used_memory, __n);
+	ATOM_ADD(&_used_memory, __n);
 
 	// _memory_block += 1
-	__sync_add_and_fetch(&_memory_block, 1); 
+	ATOM_INC(&_memory_block); 
 
 	// allocated += __n
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
-		__sync_add_and_fetch(allocated, __n);
+		ATOM_ADD(allocated, __n);
 	}
 }
 
@@ -95,17 +93,17 @@ update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
  */
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
-
+	
 	// _used_memory -= __n
-	__sync_sub_and_fetch(&_used_memory, __n);
+	ATOM_SUB(&_used_memory, __n);
 
 	// _memory_block -= 1
-	__sync_sub_and_fetch(&_memory_block, 1);
+	ATOM_DEC(&_memory_block);
 
 	// allocated -= __n
 	ssize_t* allocated = get_allocated_field(handle);
 	if(allocated) {
-		__sync_sub_and_fetch(allocated, __n);
+		ATOM_SUB(allocated, __n);
 	}
 }
 

@@ -2,6 +2,7 @@
 
 #include "socket_server.h"
 #include "socket_poll.h"
+#include "atomic.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -328,16 +329,16 @@ static int
 reserve_id(struct socket_server *ss) {
 	int i;
 	for (i=0;i<MAX_SOCKET;i++) {
-		int id = __sync_add_and_fetch(&(ss->alloc_id), 1);
+		int id = ATOM_INC(&(ss->alloc_id));
 		if (id < 0) {
 			// 进行 & 位操作, 将第 32 位符号位清除
-			id = __sync_and_and_fetch(&(ss->alloc_id), 0x7fffffff);
+			id = ATOM_AND(&(ss->alloc_id), 0x7fffffff);
 		}
 
 		// 获得对应的 socket
 		struct socket *s = &ss->slot[HASH_ID(id)];
 		if (s->type == SOCKET_TYPE_INVALID) {
-			if (__sync_bool_compare_and_swap(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
+			if (ATOM_CAS(&s->type, SOCKET_TYPE_INVALID, SOCKET_TYPE_RESERVE)) {
 				s->id = id;
 				s->fd = -1;
 				return id;

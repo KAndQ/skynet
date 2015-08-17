@@ -4,6 +4,7 @@
 #include "skynet_mq.h"
 #include "skynet_server.h"
 #include "skynet_handle.h"
+#include "spinlock.h"
 
 #include <time.h>
 #include <assert.h>
@@ -18,10 +19,6 @@
 
 // 目前没有使用到
 typedef void (*timer_execute_func)(void *ud,void *arg);
-
-// 保证线程安全的一些相关操作
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
 
 #define TIME_NEAR_SHIFT 8
 #define TIME_NEAR (1 << TIME_NEAR_SHIFT)	// 256
@@ -62,7 +59,8 @@ struct timer {
 	// t[2]: 表示第三个数量级, [0x100000, 0x3FFFFFF];
 	// t[3]: 表示第四个数量级, [0x4000000, 0xFFFFFFFF];
 	struct link_list t[4][TIME_LEVEL];
-	int lock;							// 线程安全锁
+
+	struct spinlock lock;				// 线程安全锁
 	uint32_t time;						// 不断累加的计时计数, 可以理解为以厘秒为单位
 	uint32_t current;					// 从 skynet 节点的启动系统时间开始, 每次 update 都会更新一次, 以厘秒为单位
 	uint32_t starttime;					// 当前 skynet 的启动系统时间, 以秒为单位; 只有当 current 超过 0xffffffff 的时候, starttime 才会改变
@@ -159,7 +157,7 @@ timer_add(struct timer * T, void *arg, size_t sz, int time) {
 	memcpy(node + 1, arg, sz);
 
 	// 保证线程安全
-	LOCK(T);
+	SPIN_LOCK(T);
 
 	// 计算期满时间, 这个时候有可能 node->expire < T->time, 因为超过了 4294967295
 	node->expire = time + T->time;
@@ -167,7 +165,7 @@ timer_add(struct timer * T, void *arg, size_t sz, int time) {
 	// 将 node 添加到 timer 中, 当 expire 为 0 时的特殊处理已经在 add_node 中添加了说明
 	add_node(T, node);
 
-	UNLOCK(T);
+	SPIN_UNLOCK(T);
 }
 
 /**
@@ -276,24 +274,23 @@ timer_execute(struct timer *T) {
 	
 	// 将到时间的 timer_node 取出来, 然后给各自的 context 发送消息
 	while (T->near[idx].head.next) {
-		
 		// 拿到链表头元素
-		struct timer_node * current = link_clear(&T->near[idx]);
+		struct timer_node *current = link_clear(&T->near[idx]);
 
-		UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
+		SPIN_UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
 
 		// dispatch_list don't need lock T
 		// dispatch_list 函数不需要锁住 T
 		dispatch_list(current);
 
-		LOCK(T);		// !!! LOCK, 锁住, 后面要继续使用 T
+		SPIN_LOCK(T);	// !!! LOCK, 锁住, 后面要继续使用 T
 	}
 }
 
 /// timer 的主要逻辑更新
 static void 
 timer_update(struct timer *T) {
-	LOCK(T);
+	SPIN_LOCK(T);
 
 	// try to dispatch timeout 0 (rare condition)
 	// 尝试触发超时为 0 的计时器(罕见的情况)
@@ -306,7 +303,7 @@ timer_update(struct timer *T) {
 	// 这里就是正常的时间派发了
 	timer_execute(T);
 
-	UNLOCK(T);
+	SPIN_UNLOCK(T);
 }
 
 /// 创建 struct timer
@@ -330,7 +327,8 @@ timer_create_timer() {
 		}
 	}
 
-	r->lock = 0;
+	SPIN_INIT(r)
+
 	r->current = 0;
 
 	return r;
