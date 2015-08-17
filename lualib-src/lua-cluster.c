@@ -114,11 +114,15 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 		memcpy(buf+8+namelen,msg,sz);
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> cloudwu/master
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
+
+>>>>>>> cloudwu/master
 		lua_pushlstring(L, (const char *)buf, sz+8+namelen);
 		return 0;
 	} else {
@@ -131,6 +135,7 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 		fill_uint32(buf+8+namelen, sz);
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 		lua_pushlstring(L, (const char *)buf, 12+namelen);
 		return part;
 	}
@@ -140,6 +145,14 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+		lua_pushlstring(L, (const char *)buf, 12+namelen);
+		return part;
+	}
+}
+
+>>>>>>> cloudwu/master
+=======
+
 		lua_pushlstring(L, (const char *)buf, 12+namelen);
 		return part;
 	}
@@ -254,6 +267,7 @@ static int
 unpackmreq_part(lua_State *L, const uint8_t * buf, int sz) {
 	if (sz < 5) {
 		return luaL_error(L, "Invalid cluster multi part message");
+<<<<<<< HEAD
 	}
 	int padding = (buf[0] == 2);
 	uint32_t session = unpack_uint32(buf+1);
@@ -276,6 +290,28 @@ unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
 		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
 	}
 =======
+	}
+	size_t namesz = buf[1];
+	if (sz < namesz + 6) {
+		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
+	}
+>>>>>>> cloudwu/master
+=======
+	}
+	int padding = (buf[0] == 2);
+	uint32_t session = unpack_uint32(buf+1);
+	lua_pushboolean(L, 0);	// no address
+	lua_pushinteger(L, session);
+	lua_pushlstring(L, (const char *)buf+5, sz-5);
+	lua_pushboolean(L, padding);
+
+	return 4;
+}
+
+static int
+unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
+	if (sz < 2) {
+		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
 	}
 	size_t namesz = buf[1];
 	if (sz < namesz + 6) {

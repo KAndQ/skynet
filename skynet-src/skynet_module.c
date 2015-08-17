@@ -173,7 +173,10 @@ skynet_module_query(const char * name) {
 		return result;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 如果没有加载, 保证线程的安全性
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_LOCK(M)
@@ -205,7 +208,10 @@ skynet_module_query(const char * name) {
 void 
 skynet_module_insert(struct skynet_module *mod) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 保证线程安全
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_LOCK(M)

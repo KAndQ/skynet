@@ -17,6 +17,7 @@ static unsigned int HARBOR = ~0;	// 0xffffffff
 void 
 skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 获得当前发送消息的类型, 高 8 位存的是 PTEXT_*, 请查看 skynet.h
 	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
 
@@ -24,6 +25,10 @@ skynet_harbor_send(struct remote_message *rmsg, uint32_t source, int session) {
 	rmsg->sz &= MESSAGE_TYPE_MASK;
 
 	// type 校验
+=======
+	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
+	rmsg->sz &= MESSAGE_TYPE_MASK;
+>>>>>>> cloudwu/master
 =======
 	int type = rmsg->sz >> MESSAGE_TYPE_SHIFT;
 	rmsg->sz &= MESSAGE_TYPE_MASK;

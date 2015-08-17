@@ -3,6 +3,7 @@ local cluster = require "cluster"
 
 skynet.start(function()
 <<<<<<< HEAD
+<<<<<<< HEAD
     -- query name "sdb" of cluster db.
     local sdb = cluster.query("db", "sdb")
     print("db.sbd=",sdb)
@@ -13,6 +14,8 @@ skynet.start(function()
     local v = skynet.call(proxy, "lua", "GET", largekey)
     assert(largevalue == v)
 =======
+=======
+>>>>>>> cloudwu/master
 	-- query name "sdb" of cluster db.
 	local sdb = cluster.query("db", "sdb")
 	print("db.sbd=",sdb)
@@ -25,6 +28,7 @@ skynet.start(function()
 
 	print(cluster.call("db", sdb, "GET", "a"))
 	print(cluster.call("db2", sdb, "GET", "b"))
+<<<<<<< HEAD
 >>>>>>> cloudwu/master
 
     print(cluster.call("db", sdb, "GET", "a"))
@@ -34,3 +38,10 @@ skynet.start(function()
     local pingserver = cluster.snax("db", "pingserver")
     print(pingserver.req.ping "hello")
 end)
+=======
+
+	-- test snax service
+	local pingserver = cluster.snax("db", "pingserver")
+	print(pingserver.req.ping "hello")
+end)
+>>>>>>> cloudwu/master

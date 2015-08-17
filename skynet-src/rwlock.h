@@ -4,7 +4,10 @@
 #ifndef USE_PTHREAD_LOCK
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // 读写锁的数据结构, 这个 <读> 锁可以嵌套, 但是 [写] 锁不能嵌套.
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 struct rwlock {

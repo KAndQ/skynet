@@ -17,6 +17,9 @@ local function read_response(sock)
 	local sz = socket.header(sock:read(2))
 	local msg = sock:read(sz)
 	return cluster.unpackresponse(msg)	-- session, ok, data, padding
+<<<<<<< HEAD
+>>>>>>> cloudwu/master
+=======
 >>>>>>> cloudwu/master
 end
 
@@ -88,6 +91,7 @@ local function send_request(source, node, addr, msg, sz)
     return c:request(request, session, padding)
 end
 
+<<<<<<< HEAD
 function command.req(...)
     local ok, msg, sz = pcall(send_request, ...)
     if ok then
@@ -101,6 +105,8 @@ function command.req(...)
         skynet.response()(false)
     end
 =======
+=======
+>>>>>>> cloudwu/master
 	return c:request(request, session, padding)
 end
 
@@ -180,6 +186,24 @@ function command.register(source, name, addr)
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 end
 
+<<<<<<< HEAD
+=======
+local register_name = {}
+
+function command.register(source, name, addr)
+	assert(register_name[name] == nil)
+	addr = addr or source
+	local old_name = register_name[addr]
+	if old_name then
+		register_name[old_name] = nil
+	end
+	register_name[addr] = name
+	register_name[name] = addr
+	skynet.ret(nil)
+	skynet.error(string.format("Register [%s] :%08x", name, addr))
+end
+
+>>>>>>> cloudwu/master
 local large_request = {}
 
 function command.socket(source, subcmd, fd, msg)

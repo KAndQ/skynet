@@ -234,7 +234,10 @@ skynet_context_newsession(struct skynet_context *ctx) {
 void 
 skynet_context_grab(struct skynet_context *ctx) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// ctx 的引用 +1
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	ATOM_INC(&ctx->ref);
@@ -267,10 +270,14 @@ delete_context(struct skynet_context *ctx) {
 	// 标记关联的 queue 为释放状态
 	skynet_mq_mark_release(ctx->queue);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 	CHECKCALLING_DESTROY(ctx)
 
 	// 释放内存资源
+=======
+	CHECKCALLING_DESTROY(ctx)
+>>>>>>> cloudwu/master
 =======
 	CHECKCALLING_DESTROY(ctx)
 >>>>>>> cloudwu/master
@@ -283,7 +290,10 @@ delete_context(struct skynet_context *ctx) {
 struct skynet_context * 
 skynet_context_release(struct skynet_context *ctx) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 引用计数为 0 的时候, 自动释放掉 ctx
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	if (ATOM_DEC(&ctx->ref) == 0) {
@@ -350,6 +360,7 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	// 这样在 ctx->cb 中也可以得到当前线程正在 dispatch message 的 skynet_context(handle)
 	pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx->handle));
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 	// 拿到消息类型, 高 8 位存储
 	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
@@ -358,6 +369,10 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
 
 	// 如果当前服务有日志文件, 将信息输出到日志文件中
+=======
+	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
+	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
+>>>>>>> cloudwu/master
 =======
 	int type = msg->sz >> MESSAGE_TYPE_SHIFT;
 	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
@@ -837,7 +852,10 @@ cmd_logoff(struct skynet_context * context, const char * param) {
 	if (f) {
 		// logfile may close in other thread
 <<<<<<< HEAD
+<<<<<<< HEAD
 		// 日志文件可能在其他线程被关掉
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 		if (ATOM_CAS_POINTER(&ctx->logfile, f, NULL)) {
@@ -939,7 +957,10 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 高 8 位存储 PTYPE_*
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	*sz |= (size_t)type << MESSAGE_TYPE_SHIFT;
@@ -948,7 +969,10 @@ _filter_args(struct skynet_context * context, int type, int *session, void ** da
 int
 skynet_send(struct skynet_context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 数据大小的判断
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	if ((sz & MESSAGE_TYPE_MASK) != sz) {

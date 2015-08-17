@@ -48,8 +48,11 @@ get_allocated_field(uint32_t handle) {
 	if(old_handle == 0 || old_alloc <= 0) {
 		// data->allocated may less than zero, because it may not count at start.
 <<<<<<< HEAD
+<<<<<<< HEAD
 		// 译文: data->allocated 可能小于 0, 因为它可能在开始的时候没有计数.
 		// 将 handle 赋值给 data->handle, 并且成功之后, 才继续进行下面的处理.
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 		if(!ATOM_CAS(&data->handle, old_handle, handle)) {
@@ -58,7 +61,10 @@ get_allocated_field(uint32_t handle) {
 
 		if (old_alloc < 0) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 			// 保证其他线程没有对 data->allocated 做操作的时候, 设置 data->allocated 为 0.
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 			ATOM_CAS(&data->allocated, old_alloc, 0);
@@ -81,6 +87,7 @@ get_allocated_field(uint32_t handle) {
 inline static void 
 update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// _used_memory += __n
 	ATOM_ADD(&_used_memory, __n);
 
@@ -88,6 +95,10 @@ update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
 	ATOM_INC(&_memory_block); 
 
 	// allocated += __n
+=======
+	ATOM_ADD(&_used_memory, __n);
+	ATOM_INC(&_memory_block); 
+>>>>>>> cloudwu/master
 =======
 	ATOM_ADD(&_used_memory, __n);
 	ATOM_INC(&_memory_block); 
@@ -106,6 +117,7 @@ update_xmalloc_stat_alloc(uint32_t handle, size_t __n) {
 inline static void
 update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// _used_memory -= __n
 	ATOM_SUB(&_used_memory, __n);
 
@@ -113,6 +125,10 @@ update_xmalloc_stat_free(uint32_t handle, size_t __n) {
 	ATOM_DEC(&_memory_block);
 
 	// allocated -= __n
+=======
+	ATOM_SUB(&_used_memory, __n);
+	ATOM_DEC(&_memory_block);
+>>>>>>> cloudwu/master
 =======
 	ATOM_SUB(&_used_memory, __n);
 	ATOM_DEC(&_memory_block);

@@ -24,6 +24,7 @@
 // 管理 skynet_message 的队列, 循环队列数据结构
 struct message_queue {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	struct spinlock lock;	// 线程安全锁
 	uint32_t handle;	// 关联 skynet_context 的 handle
 	int cap;	// 当前能存放消息的最大容量
@@ -36,6 +37,8 @@ struct message_queue {
 	struct skynet_message *queue;	// skynet_message 的数组
 	struct message_queue *next;		// 当压入到全局队列的时候, 关联的下一个 message_queue
 =======
+=======
+>>>>>>> cloudwu/master
 	struct spinlock lock;
 	uint32_t handle;
 	int cap;
@@ -60,6 +63,9 @@ struct global_queue {
 	struct message_queue *head;
 	struct message_queue *tail;
 	struct spinlock lock;
+<<<<<<< HEAD
+>>>>>>> cloudwu/master
+=======
 >>>>>>> cloudwu/master
 };
 
@@ -73,7 +79,11 @@ skynet_globalmq_push(struct message_queue * queue) {
 	SPIN_LOCK(q)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 保证 queue 之前并没有加入到列表中
+=======
+	SPIN_LOCK(q)
+>>>>>>> cloudwu/master
 =======
 	SPIN_LOCK(q)
 >>>>>>> cloudwu/master
@@ -89,7 +99,10 @@ skynet_globalmq_push(struct message_queue * queue) {
 		q->head = q->tail = queue;
 	}
 <<<<<<< HEAD
+<<<<<<< HEAD
 
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_UNLOCK(q)
@@ -100,9 +113,13 @@ skynet_globalmq_pop() {
 	struct global_queue *q = Q;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 保证线程安全
 	SPIN_LOCK(q)
 
+=======
+	SPIN_LOCK(q)
+>>>>>>> cloudwu/master
 =======
 	SPIN_LOCK(q)
 >>>>>>> cloudwu/master
@@ -159,10 +176,14 @@ _release(struct message_queue *q) {
 	// 保证传入的 q 已经不在 global_queue 中
 	assert(q->next == NULL);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 	SPIN_DESTROY(q)
 
 	// 释放资源
+=======
+	SPIN_DESTROY(q)
+>>>>>>> cloudwu/master
 =======
 	SPIN_DESTROY(q)
 >>>>>>> cloudwu/master
@@ -209,11 +230,14 @@ int
 skynet_mq_pop(struct message_queue *q, struct skynet_message *message) {
 	int ret = 1;
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	SPIN_LOCK(q)
 >>>>>>> cloudwu/master
 
 	// 保证线程安全
+=======
+>>>>>>> cloudwu/master
 	SPIN_LOCK(q)
 
 	// 保证 q 不是空队列
@@ -286,11 +310,14 @@ void
 skynet_mq_push(struct message_queue *q, struct skynet_message *message) {
 	assert(message);
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	SPIN_LOCK(q)
 >>>>>>> cloudwu/master
 
 	// 保证线程安全
+=======
+>>>>>>> cloudwu/master
 	SPIN_LOCK(q)
 
 	// 将 message 压入队尾
@@ -336,10 +363,14 @@ skynet_mq_init() {
 void 
 skynet_mq_mark_release(struct message_queue *q) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 保证线程安全
 	SPIN_LOCK(q)
 
 	// 之前没有被标记为释放
+=======
+	SPIN_LOCK(q)
+>>>>>>> cloudwu/master
 =======
 	SPIN_LOCK(q)
 >>>>>>> cloudwu/master
@@ -353,7 +384,10 @@ skynet_mq_mark_release(struct message_queue *q) {
 		skynet_globalmq_push(q);
 	}
 <<<<<<< HEAD
+<<<<<<< HEAD
 
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_UNLOCK(q)
@@ -381,7 +415,10 @@ _drop_queue(struct message_queue *q, message_drop drop_func, void *ud) {
 void 
 skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// 保证线程安全
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_LOCK(q)

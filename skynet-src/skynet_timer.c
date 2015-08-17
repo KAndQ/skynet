@@ -61,6 +61,7 @@ struct timer {
 	struct link_list t[4][TIME_LEVEL];
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 
@@ -71,6 +72,8 @@ struct timer {
 	uint64_t current_point;		// 记录当前的运行时间, 以厘秒为单位
 	uint64_t origin_point;		// 记录 skynet 节点的启动运行时间, 以厘秒为单位
 =======
+=======
+>>>>>>> cloudwu/master
 	struct spinlock lock;
 	uint32_t time;
 	uint32_t current;
@@ -160,14 +163,19 @@ add_node(struct timer * T, struct timer_node * node) {
 static void
 timer_add(struct timer * T, void *arg, size_t sz, int time) {
 
+<<<<<<< HEAD
 	// 分配 timer_node 的内存空间
 	// 注意! 这里多分配了 sz 的内存容量, 用来存储 arg 的数据
 	struct timer_node * node = (struct timer_node *)skynet_malloc(sizeof(*node) + sz);
+=======
+	SPIN_LOCK(T);
+>>>>>>> cloudwu/master
 
 	// 在 node 内存容量之后, 存储 arg 的数据,
 	// 注意, 这里对 arg 的数据进行了复制.
 	memcpy(node + 1, arg, sz);
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 	// 保证线程安全
 =======
@@ -181,6 +189,8 @@ timer_add(struct timer * T, void *arg, size_t sz, int time) {
 	// 将 node 添加到 timer 中, 当 expire 为 0 时的特殊处理已经在 add_node 中添加了说明
 	add_node(T, node);
 
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 	SPIN_UNLOCK(T);
@@ -295,6 +305,7 @@ timer_execute(struct timer *T) {
 		// 拿到链表头元素
 		struct timer_node *current = link_clear(&T->near[idx]);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 		SPIN_UNLOCK(T);		// !!! UNLOCK, 可以让其他的线程继续操作 T
 		
@@ -304,12 +315,19 @@ timer_execute(struct timer *T) {
 >>>>>>> cloudwu/master
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
+		SPIN_UNLOCK(T);
+>>>>>>> cloudwu/master
 		// dispatch_list don't need lock T
 		// dispatch_list 函数不需要锁住 T
 		dispatch_list(current);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 		SPIN_LOCK(T);		// !!! LOCK, 锁住, 后面要继续使用 T
+=======
+		SPIN_LOCK(T);
+>>>>>>> cloudwu/master
 =======
 		SPIN_LOCK(T);
 >>>>>>> cloudwu/master

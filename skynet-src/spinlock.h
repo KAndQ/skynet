@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 /**
  * 线程锁, 定义自制的自旋锁, 和互斥量锁.
  */
@@ -16,6 +17,11 @@
 >>>>>>> cloudwu/master
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
+#ifndef SKYNET_SPINLOCK_H
+#define SKYNET_SPINLOCK_H
+
+>>>>>>> cloudwu/master
 #define SPIN_INIT(q) spinlock_init(&(q)->lock);
 #define SPIN_LOCK(q) spinlock_lock(&(q)->lock);
 #define SPIN_UNLOCK(q) spinlock_unlock(&(q)->lock);
@@ -24,7 +30,10 @@
 #ifndef USE_PTHREAD_LOCK
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /// 自定义自旋锁数据结构
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 struct spinlock {
@@ -32,7 +41,10 @@ struct spinlock {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /// 初始化
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 static inline void
@@ -41,7 +53,10 @@ spinlock_init(struct spinlock *lock) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /// 上锁
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 static inline void
@@ -50,7 +65,10 @@ spinlock_lock(struct spinlock *lock) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /// 尝试获得锁, 如果成功获得锁返回 1, 否则返回 0
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 static inline int
@@ -59,7 +77,10 @@ spinlock_trylock(struct spinlock *lock) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /// 解锁
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 static inline void
@@ -68,7 +89,10 @@ spinlock_unlock(struct spinlock *lock) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /// 销毁锁
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 static inline void
@@ -82,6 +106,7 @@ spinlock_destroy(struct spinlock *lock) {
 // we use mutex instead of spinlock for some reason
 // you can also replace to pthread_spinlock
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 // 我们因为某些原因使用互斥量代替自旋锁
 // 你也可以使用 pthread_spinlock_t 做替换
@@ -99,6 +124,8 @@ UNIX 环境高级编程, 11 章-线程-线程同步, 有介绍各个锁
 
 // 以前接口的声明定义, 同上
 
+=======
+>>>>>>> cloudwu/master
 =======
 >>>>>>> cloudwu/master
 struct spinlock {

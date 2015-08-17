@@ -14,9 +14,12 @@
 
 struct skynet_env {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	struct spinlock lock;		// 简单的多线程锁
 	lua_State *L;	// lua 沙箱
 =======
+=======
+>>>>>>> cloudwu/master
 	struct spinlock lock;
 	lua_State *L;
 >>>>>>> cloudwu/master

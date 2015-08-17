@@ -36,12 +36,15 @@ skynet_monitor_trigger(struct skynet_monitor *sm, uint32_t source, uint32_t dest
 	sm->destination = destination;
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> cloudwu/master
 =======
 
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
+>>>>>>> cloudwu/master
 	ATOM_INC(&sm->version);
 }
 
