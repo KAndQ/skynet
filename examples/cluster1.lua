@@ -7,6 +7,9 @@ skynet.start(function()
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
@@ -17,6 +20,7 @@ skynet.start(function()
     -- register name "sdb" for simpledb, you can use cluster.query() later.
     -- See cluster2.lua
     cluster.register("sdb", sdb)
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -54,6 +58,9 @@ end)
 =======
 
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
+
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
     print(skynet.call(sdb, "lua", "SET", "a", "foobar"))
     print(skynet.call(sdb, "lua", "SET", "b", "foobar2"))
     print(skynet.call(sdb, "lua", "GET", "a"))
@@ -64,6 +71,10 @@ end)
     snax.uniqueservice "pingserver"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+end)
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
 end)
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======

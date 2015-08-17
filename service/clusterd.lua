@@ -90,6 +90,7 @@ local function send_request(source, node, addr, msg, sz)
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     return c:request(request, session, padding)
 end
 
@@ -142,6 +143,12 @@ end
 
 function command.req(...)
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
+    return c:request(request, session, padding)
+end
+
+function command.req(...)
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
     local ok, msg, sz = pcall(send_request, ...)
     if ok then
         if type(msg) == "table" then
@@ -155,6 +162,9 @@ function command.req(...)
     end
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
+=======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
@@ -179,6 +189,9 @@ function command.register(source, name, addr)
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
@@ -198,6 +211,7 @@ function command.register(source, name, addr)
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	assert(register_name[name] == nil)
 	addr = addr or source
@@ -210,6 +224,8 @@ function command.register(source, name, addr)
 	skynet.ret(nil)
 	skynet.error(string.format("Register [%s] :%08x", name, addr))
 >>>>>>> cloudwu/master
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
@@ -243,6 +259,9 @@ function command.socket(source, subcmd, fd, msg)
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
@@ -308,6 +327,7 @@ function command.socket(source, subcmd, fd, msg)
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 	if subcmd == "data" then
 		local sz
@@ -366,6 +386,8 @@ function command.socket(source, subcmd, fd, msg)
 		skynet.error(string.format("socket %s %d : %s", subcmd, fd, msg))
 	end
 >>>>>>> cloudwu/master
+=======
+>>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
 >>>>>>> parent of 5702862... Merge branch 'cloudwu/master'
 =======
