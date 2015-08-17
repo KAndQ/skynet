@@ -17,7 +17,7 @@
 
 #define MAX_INFO 128			// socker_server 存储一些信息数据分配的内存空间
 // MAX_SOCKET will be 2^MAX_SOCKET_P
-#define MAX_SOCKET_P 16			// 决定能够管理的 socket 数量, 直接控制当前 skynet 节点能够操作的 socket 数量
+#define MAX_SOCKET_P 16			// 开启 socket 数量的幂, 直接控制当前 skynet 节点能够操作的 socket 数量
 #define MAX_EVENT 64			// 每次从 event pool 中读取 event 的最大数量
 #define MIN_READ_BUFFER 64		// 初始化 socket 读取数据的最小字节数
 
