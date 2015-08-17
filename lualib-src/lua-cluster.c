@@ -112,6 +112,10 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 		memcpy(buf+4, name, namelen);
 		fill_uint32(buf+4+namelen, (uint32_t)session);
 		memcpy(buf+8+namelen,msg,sz);
+<<<<<<< HEAD
+=======
+
+>>>>>>> cloudwu/master
 		lua_pushlstring(L, (const char *)buf, sz+8+namelen);
 		return 0;
 	} else {
@@ -122,11 +126,20 @@ packreq_string(lua_State *L, int session, void * msg, uint32_t sz) {
 		memcpy(buf+4, name, namelen);
 		fill_uint32(buf+4+namelen, (uint32_t)session);
 		fill_uint32(buf+8+namelen, sz);
+<<<<<<< HEAD
 		lua_pushlstring(L, (const char *)buf, 12+namelen);
 		return part;
 	}
 }
 
+=======
+
+		lua_pushlstring(L, (const char *)buf, 12+namelen);
+		return part;
+	}
+}
+
+>>>>>>> cloudwu/master
 static void
 packreq_multi(lua_State *L, int session, void * msg, uint32_t sz) {
 	uint8_t buf[TEMP_LENGTH];
@@ -250,11 +263,19 @@ static int
 unpackreq_string(lua_State *L, const uint8_t * buf, int sz) {
 	if (sz < 2) {
 		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
+<<<<<<< HEAD
 	}
 	size_t namesz = buf[1];
 	if (sz < namesz + 6) {
 		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
 	}
+=======
+	}
+	size_t namesz = buf[1];
+	if (sz < namesz + 6) {
+		return luaL_error(L, "Invalid cluster message (size=%d)", sz);
+	}
+>>>>>>> cloudwu/master
 	lua_pushlstring(L, (const char *)buf+2, namesz);
 	uint32_t session = unpack_uint32(buf + namesz + 2);
 	lua_pushinteger(L, (uint32_t)session);

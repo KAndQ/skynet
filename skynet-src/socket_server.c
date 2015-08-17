@@ -331,7 +331,10 @@ reserve_id(struct socket_server *ss) {
 	for (i=0;i<MAX_SOCKET;i++) {
 		int id = ATOM_INC(&(ss->alloc_id));
 		if (id < 0) {
+<<<<<<< HEAD
 			// 进行 & 位操作, 将第 32 位符号位清除
+=======
+>>>>>>> cloudwu/master
 			id = ATOM_AND(&(ss->alloc_id), 0x7fffffff);
 		}
 

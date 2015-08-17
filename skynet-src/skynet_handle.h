@@ -12,10 +12,14 @@
 #include <stdint.h>
 
 // reserve high 8 bits for remote id
+<<<<<<< HEAD
 // 保留高 8 位用来存储远程节点的 id
 #define HANDLE_MASK 0xffffff        // 用于计算 handle 的值
 
  // 计算 handle 时的位偏移量
+=======
+#define HANDLE_MASK 0xffffff
+>>>>>>> cloudwu/master
 #define HANDLE_REMOTE_SHIFT 24
 
 struct skynet_context;

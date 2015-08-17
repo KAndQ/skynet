@@ -9,9 +9,15 @@ local node_session = {}
 local command = {}
 
 local function read_response(sock)
+<<<<<<< HEAD
     local sz = socket.header(sock:read(2))
     local msg = sock:read(sz)
     return cluster.unpackresponse(msg)  -- session, ok, data, padding
+=======
+	local sz = socket.header(sock:read(2))
+	local msg = sock:read(sz)
+	return cluster.unpackresponse(msg)	-- session, ok, data, padding
+>>>>>>> cloudwu/master
 end
 
 local function open_channel(t, key)
@@ -62,14 +68,22 @@ function command.listen(source, addr, port)
 end
 
 local function send_request(source, node, addr, msg, sz)
+<<<<<<< HEAD
     local session = node_session[node] or 1
     -- msg is a local pointer, cluster.packrequest will free it
     local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
     node_session[node] = new_session
+=======
+	local session = node_session[node] or 1
+	-- msg is a local pointer, cluster.packrequest will free it
+	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
+	node_session[node] = new_session
+>>>>>>> cloudwu/master
 
     -- node_channel[node] may yield or throw error
     local c = node_channel[node]
 
+<<<<<<< HEAD
     return c:request(request, session, padding)
 end
 
@@ -85,6 +99,23 @@ function command.req(...)
         skynet.error(msg)
         skynet.response()(false)
     end
+=======
+	return c:request(request, session, padding)
+end
+
+function command.req(...)
+	local ok, msg, sz = pcall(send_request, ...)
+	if ok then
+		if type(msg) == "table" then
+			skynet.ret(cluster.concat(msg))
+		else
+			skynet.ret(msg)
+		end
+	else
+		skynet.error(msg)
+		skynet.response()(false)
+	end
+>>>>>>> cloudwu/master
 end
 
 local proxy = {}
@@ -100,6 +131,7 @@ end
 local register_name = {}
 
 function command.register(source, name, addr)
+<<<<<<< HEAD
     assert(register_name[name] == nil)
     addr = addr or source
     local old_name = register_name[addr]
@@ -110,11 +142,24 @@ function command.register(source, name, addr)
     register_name[name] = addr
     skynet.ret(nil)
     skynet.error(string.format("Register [%s] :%08x", name, addr))
+=======
+	assert(register_name[name] == nil)
+	addr = addr or source
+	local old_name = register_name[addr]
+	if old_name then
+		register_name[old_name] = nil
+	end
+	register_name[addr] = name
+	register_name[name] = addr
+	skynet.ret(nil)
+	skynet.error(string.format("Register [%s] :%08x", name, addr))
+>>>>>>> cloudwu/master
 end
 
 local large_request = {}
 
 function command.socket(source, subcmd, fd, msg)
+<<<<<<< HEAD
     if subcmd == "data" then
         local sz
         local addr, session, msg, padding = cluster.unpackrequest(msg)
@@ -171,6 +216,64 @@ function command.socket(source, subcmd, fd, msg)
         large_request = {}
         skynet.error(string.format("socket %s %d : %s", subcmd, fd, msg))
     end
+=======
+	if subcmd == "data" then
+		local sz
+		local addr, session, msg, padding = cluster.unpackrequest(msg)
+		if padding then
+			local req = large_request[session] or { addr = addr }
+			large_request[session] = req
+			table.insert(req, msg)
+			return
+		else
+			local req = large_request[session]
+			if req then
+				large_request[session] = nil
+				table.insert(req, msg)
+				msg,sz = cluster.concat(req)
+				addr = req.addr
+			end
+			if not msg then
+				local response = cluster.packresponse(session, false, "Invalid large req")
+				socket.write(fd, response)
+				return
+			end
+		end
+		local ok, response
+		if addr == 0 then
+			local name = skynet.unpack(msg, sz)
+			local addr = register_name[name]
+			if addr then
+				ok = true
+				msg, sz = skynet.pack(addr)
+			else
+				ok = false
+				msg = "name not found"
+			end
+		else
+			ok , msg, sz = pcall(skynet.rawcall, addr, "lua", msg, sz)
+		end
+		if ok then
+			response = cluster.packresponse(session, true, msg, sz)
+			if type(response) == "table" then
+				for _, v in ipairs(response) do
+					socket.lwrite(fd, v)
+				end
+			else
+				socket.write(fd, response)
+			end
+		else
+			response = cluster.packresponse(session, false, msg)
+			socket.write(fd, response)
+		end
+	elseif subcmd == "open" then
+		skynet.error(string.format("socket accept from %s", msg))
+		skynet.call(source, "lua", "accept", fd)
+	else
+		large_request = {}
+		skynet.error(string.format("socket %s %d : %s", subcmd, fd, msg))
+	end
+>>>>>>> cloudwu/master
 end
 
 skynet.start(function()
