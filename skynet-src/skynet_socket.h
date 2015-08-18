@@ -59,7 +59,7 @@ void skynet_socket_start(struct skynet_context *ctx, int id);
 /// 设置 socket 的 nodelay, 禁用 nagle 算法
 void skynet_socket_nodelay(struct skynet_context *ctx, int id);
 
-/// 创建爱你一个 udp socket. 返回值, 创建成功返回 socket id, 否则返回 -1
+/// 创建一个 udp socket. 返回值, 创建成功返回 socket id, 否则返回 -1
 int skynet_socket_udp(struct skynet_context *ctx, const char * addr, int port);
 
 /// 设置指定 socket 的地址信息. 返回值, 成功返回 0, 否则返回 -1

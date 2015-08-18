@@ -79,7 +79,7 @@ lnewpool(lua_State *L, int sz) {
 
 	// luaL_newmetatable 这时栈顶是一个 table 类型
 	if (luaL_newmetatable(L, "buffer_pool")) {
-		// 给栈顶的表的 __gc 字段关联 lfreepool 函数
+		// 给栈顶的表的 __gc 字段关联 lfreepool 函数, 给分配的 userdata 添加终结器, 执行释放内存前的一些操作.
 		lua_pushcfunction(L, lfreepool);
 		lua_setfield(L, -2, "__gc");
 	}
@@ -250,7 +250,7 @@ return_free_node(lua_State *L, int pool, struct socket_buffer *sb) {
 }
 
 /**
- * 从 sb 中读取 sz 大小的数据压入到 lua 中, 压入到 lua 的数据大小是 (sz - skip).
+ * 从 sb 中读取 sz 大小的数据压入到 lua 中, 压入到 lua 的数据大小是 (sz - skip). lua 栈顶将压入一个 string 类型, 是从 socket_buffer 读取的数据.
  * sz: 需要读取数据的大小
  * skip: 分隔符字符串的长度
  */
@@ -322,6 +322,8 @@ pop_lstring(lua_State *L, struct socket_buffer *sb, int sz, int skip) {
 		current = sb->head;
 		assert(current);
 	}
+
+	// 结束对缓存 B 的使用，将最终的字符串留在栈顶
 	luaL_pushresult(&b);
 }
 
@@ -397,28 +399,50 @@ lpopbuffer(lua_State *L) {
 /*
 	userdata send_buffer
 	table pool
+
+	-------------------------------------
+	userdata socket_buffer
+	table pool
+
+	清除 socket_buffer 内的所有数据资源, 将所有弹出的空闲 buffer_node 放置到 pool[1] 栈中.
+	lua: 接收 2 个参数, 0 个返回值.
  */
 static int
 lclearbuffer(lua_State *L) {
+	// 获取第一个参数
 	struct socket_buffer * sb = lua_touserdata(L, 1);
 	if (sb == NULL) {
 		return luaL_error(L, "Need buffer object at param 1");
 	}
+
+	// 检测第二个参数
 	luaL_checktype(L,2,LUA_TTABLE);
+
+	// 将 socket_buffer 的所有数据弹出, 并且释放其资源
 	while(sb->head) {
 		return_free_node(L,2,sb);
 	}
 	sb->size = 0;
+
 	return 0;
 }
 
+/**
+ * 读取 socket_buffer 中的所有数据
+ * lua: 接收 2 个参数, 参数 1: socket_buffer, 参数 2: table pool; 1 个返回值, 所有 socket_buffer 中的数据.
+ */
 static int
 lreadall(lua_State *L) {
+	// 获得参数 1, socket_buffer
 	struct socket_buffer * sb = lua_touserdata(L, 1);
 	if (sb == NULL) {
 		return luaL_error(L, "Need buffer object at param 1");
 	}
+
+	// 检查参数 2, table
 	luaL_checktype(L,2,LUA_TTABLE);
+
+	// 读取 socket_buffer 中的所有数据, 并且压入 lua
 	luaL_Buffer b;
 	luaL_buffinit(L, &b);
 	while(sb->head) {
@@ -428,32 +452,62 @@ lreadall(lua_State *L) {
 	}
 	luaL_pushresult(&b);
 	sb->size = 0;
+
 	return 1;
 }
 
+/**
+ * 释放内存资源
+ * lua: 接收 2 个参数, 参数 1: userdata, 释放内存资源的指针; 参数 2: 整型, 没有使用; 没有返回值.
+ */
 static int
 ldrop(lua_State *L) {
+	// 获得参数 1
 	void * msg = lua_touserdata(L,1);
+
+	// 检查参数 2
 	luaL_checkinteger(L,2);
+
 	skynet_free(msg);
 	return 0;
 }
 
+/**
+ * 分隔符检查
+ * @param node buffer_node
+ * @param from 指针偏移量, 从 buffer_node.msg + from 处开始比较
+ * @param sep 分隔数据
+ * @param seplen 分隔数据的长度
+ * @return 如果 node 接下来的连续内存数据与 sep 相同, 返回 true, 否则返回 false.
+ */
 static bool
 check_sep(struct buffer_node * node, int from, const char *sep, int seplen) {
 	for (;;) {
 		int sz = node->sz - from;
+
+		// node 有足够的数据可读
 		if (sz >= seplen) {
+			// int memcmp(const void *buf1, const void *buf2, unsigned int count);
+			// memcmp 是比较内存区域 buf1 和 buf2 的前 count 个字节。该函数是按字节比较的。
+			// 当 buf1 < buf2 时，返回值 < 0; 当 buf1 == buf2 时，返回值 = 0; 当 buf1 > buf2 时，返回值 > 0
 			return memcmp(node->msg+from,sep,seplen) == 0;
 		}
+
+		// node 没有足够的数据可读, 那么只比较可读的部分
 		if (sz > 0) {
 			if (memcmp(node->msg + from, sep, sz)) {
 				return false;
 			}
 		}
+
+		// 获得下一个节点
 		node = node->next;
+
+		// 跳过已经比较过的部分
 		sep += sz;
 		seplen -= sz;
+
+		// 下个节点的偏移量总 0 开始
 		from = 0;
 	}
 }
@@ -462,25 +516,44 @@ check_sep(struct buffer_node * node, int from, const char *sep, int seplen) {
 	userdata send_buffer
 	table pool , nil for check
 	string sep
+
+	----------------------------------------
+	userdata socket_buffer
+	table pool, nil 用于检查
+	string sep: 分割字符串
+
+	lua 返回值: 如果第二个参数为 nil, 同时如果分隔符有效(有期望的数据可读), 返回 true, 否则返回 nil(其实是无数据返回);
+	如果第二个参数不为 nil, 同时分隔符有效, 那么返回读取的字符串, 否则返回 nil(其实也是无数据返回).
  */
 static int
 lreadline(lua_State *L) {
+	// 获得参数 1, socket_buffer
 	struct socket_buffer * sb = lua_touserdata(L, 1);
 	if (sb == NULL) {
 		return luaL_error(L, "Need buffer object at param 1");
 	}
 
 	// only check
+	// 只检查
 	bool check = !lua_istable(L, 2);
+
+	// 获得第三个参数
 	size_t seplen = 0;
 	const char *sep = luaL_checklstring(L,3,&seplen);
+
 	int i;
 	struct buffer_node *current = sb->head;
+
+	// 保证有数据可读
 	if (current == NULL)
 		return 0;
+
 	int from = sb->offset;
+
+	// 剩余可读数据
 	int bytes = current->sz - from;
-	for (i=0;i<=sb->size - (int)seplen;i++) {
+
+	for (i = 0; i <= sb->size - (int)seplen/* socket_buffer 中有足够的数据可读 */; i++) {
 		if (check_sep(current, from, sep, seplen)) {
 			if (check) {
 				lua_pushboolean(L,true);
@@ -490,11 +563,20 @@ lreadline(lua_State *L) {
 			}
 			return 1;
 		}
+
+		// 增加 1 个偏移量
 		++from;
+
+		// 减少可读数据数量
 		--bytes;
+
+		// 如果当前的 buffer_node 数据读完, 则继续从下一个节点读取
 		if (bytes == 0) {
+			// 重置数据
 			current = current->next;
 			from = 0;
+
+			// 无数据可读则跳出循环
 			if (current == NULL)
 				break;
 			bytes = current->sz;
@@ -503,38 +585,66 @@ lreadline(lua_State *L) {
 	return 0;
 }
 
+/**
+ * 将一个字符串转化为一个指针, string ====>>>> lightuserdata
+ * lua: 接收 1 个参数, string 类型; 2 个返回值, 字符串的长度, lightuserdata.
+ */
 static int
 lstr2p(lua_State *L) {
+	// 获得参数 1, string
 	size_t sz = 0;
 	const char * str = luaL_checklstring(L,1,&sz);
+
+	// 对字符串的内容进行复制
 	void *ptr = skynet_malloc(sz);
 	memcpy(ptr, str, sz);
+
+	// 压入返回值
 	lua_pushlightuserdata(L, ptr);
 	lua_pushinteger(L, (int)sz);
 	return 2;
 }
 
 // for skynet socket
+// 用于 skynet socket
 
 /*
 	lightuserdata msg
 	integer size
 
 	return type n1 n2 ptr_or_string
+
+	----------------------------------------
+	接收 2 个参数
+	lightuserdata msg, skynet_socket_message 指针
+	integer size, 数据长度
+
+	4 个返回值, type, n1, n2, 指针或者字符串
+	type: skynet_socket_message.type
+	n1: skynet_socket_message.id
+	n2: skynet_socket_message.ud
+	参数4: 如果 skynet_socket_message.buffer 有值, 则保存其指针; 否则保存 skynet_socket_message 后续内存的字符串数据
+	参数5: 只用于 udp 协议, 存储的是地址信息
 */
 static int
 lunpack(lua_State *L) {
+	// 获得参数 1, skynet_socket_message
 	struct skynet_socket_message *message = lua_touserdata(L,1);
+
+	// 获得参数 2, size
 	int size = luaL_checkinteger(L,2);
 
-	lua_pushinteger(L, message->type);
-	lua_pushinteger(L, message->id);
-	lua_pushinteger(L, message->ud);
-	if (message->buffer == NULL) {
-		lua_pushlstring(L, (char *)(message+1),size - sizeof(*message));
-	} else {
+	lua_pushinteger(L, message->type);	// 返回值 1
+	lua_pushinteger(L, message->id);	// 返回值 2
+	lua_pushinteger(L, message->ud);	// 返回值 3
+
+	if (message->buffer == NULL) {	// 获取 skynet_socket_message 内存数据之后的内容, 可以查看 skynet_socket.c 的 forward_message 函数.
+		lua_pushlstring(L, (char *)(message+1), size - sizeof(*message));
+	} else {	// 保存数据的指针
 		lua_pushlightuserdata(L, message->buffer);
 	}
+
+	// 获得 udp 的地址信息, 作为第 5 个参数
 	if (message->type == SKYNET_SOCKET_TYPE_UDP) {
 		int addrsz = 0;
 		const char * addrstring = skynet_socket_udp_address(message, &addrsz);
@@ -543,15 +653,31 @@ lunpack(lua_State *L) {
 			return 5;
 		}
 	}
+
 	return 4;
 }
 
+/**
+ * 获得地址和端口
+ * @param L lua_State
+ * @param tmp 存储主机地址
+ * @param addr 传入的地址信息字符串, 可能包含端口, 如果在没有传入端口参数的情况下, 会解析这个字符串得到端口数据
+ * @param port_index 参数端口号在 lua 栈中的索引
+ * @param port 存储端口号
+ * @return 返回主机地址字符串, 不包含端口信息
+ */
 static const char *
 address_port(lua_State *L, char *tmp, const char * addr, int port_index, int *port) {
 	const char * host;
-	if (lua_isnoneornil(L,port_index)) {
+	if (lua_isnoneornil(L,port_index)/* 当给定索引无效或其值是 nil 时， 返回 1 ，否则返回 0 。 */) {
+
+		// char *strchr(char* _Str,int _Ch)
+		// 查找字符串s中首次出现字符c的位置
+		// 返回首次出现 _Ch 的位置的指针，返回的地址是被查找字符串指针开始的第一个与 _Ch 相同字符的指针，如果 _Str 中不存在 _Ch 则返回 NULL。
+		// 成功则返回要查找字符第一次出现的位置，失败返回 NULL
+
 		host = strchr(addr, '[');
-		if (host) {
+		if (host) {		// ipv6 字符串格式解析, 格式应该是 [xxxx:xxxx]:port
 			// is ipv6
 			++host;
 			const char * sep = strchr(addr,']');
@@ -566,7 +692,8 @@ address_port(lua_State *L, char *tmp, const char * addr, int port_index, int *po
 				luaL_error(L, "Invalid address %s.",addr);
 			}
 			*port = strtoul(sep+1,NULL,10);
-		} else {
+
+		} else {		// ipv4 字符串格式解析, 格式应该是 xxx.xxx.xxx.xxx:port
 			// is ipv4
 			const char * sep = strchr(addr,':');
 			if (sep == NULL) {
@@ -584,16 +711,25 @@ address_port(lua_State *L, char *tmp, const char * addr, int port_index, int *po
 	return host;
 }
 
+/**
+ * 连接到指定的主机
+ * lua: 接收 2 个参数, 参数 1, string 地址字符串; 参数 2, integer 端口号; 1 个返回值, 可供使用的 socket id
+ */
 static int
 lconnect(lua_State *L) {
+
+	// 获得第一个参数, 地址字符串
 	size_t sz = 0;
 	const char * addr = luaL_checklstring(L,1,&sz);
+
+	// 获得第二个参数或数据, 端口号
 	char tmp[sz];
 	int port = 0;
 	const char * host = address_port(L, tmp, addr, 2, &port);
 	if (port == 0) {
 		return luaL_error(L, "Invalid port");
 	}
+
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = skynet_socket_connect(ctx, host, port);
 	lua_pushinteger(L, id);
@@ -601,6 +737,10 @@ lconnect(lua_State *L) {
 	return 1;
 }
 
+/**
+ * 请求关闭一个 socket
+ * lua: 接收 1 个参数, 整型, socket id; 0 个返回值.
+ */
 static int
 lclose(lua_State *L) {
 	int id = luaL_checkinteger(L,1);
@@ -609,6 +749,10 @@ lclose(lua_State *L) {
 	return 0;
 }
 
+/**
+ * 侦听指定的端口地址
+ * lua: 接收 3 个参数, 参数 1, 主机地址; 参数 2, 端口; 参数 3, backlog, 如果不传此参数, 将使用默认值; 1 个返回值, socket id
+ */
 static int
 llisten(lua_State *L) {
 	const char * host = luaL_checkstring(L,1);
@@ -624,12 +768,23 @@ llisten(lua_State *L) {
 	return 1;
 }
 
+/**
+ * 获得数据指针和数据长度
+ * @param L lua_State
+ * @param index 获得数据的 lua 栈索引
+ * @param sz 获得数据的大小
+ * @return 
+ */
 static void *
 get_buffer(lua_State *L, int index, int *sz) {
 	void *buffer;
+
+	// userdata 类型
 	if (lua_isuserdata(L,index)) {
 		buffer = lua_touserdata(L,index);
 		*sz = luaL_checkinteger(L,index+1);
+
+	// string 类型
 	} else {
 		size_t len = 0;
 		const char * str =  luaL_checklstring(L, index, &len);
@@ -640,27 +795,51 @@ get_buffer(lua_State *L, int index, int *sz) {
 	return buffer;
 }
 
+/**
+ * 使用高优先级队列发送数据
+ * lua: 接收 2 或者 3 个参数, 参数 1, socket id; 参数 2, 如果是 string, 那么无需传入参数 3, 如果是 lightuserdata 那么需要参数 3, 表示数据的大小.
+ * 1 个返回值, boolean 类型, true 表示成功.
+ */
 static int
 lsend(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+
+	// 获得参数 1
 	int id = luaL_checkinteger(L, 1);
+
+	// 获得参数 2, 3
 	int sz = 0;
 	void *buffer = get_buffer(L, 2, &sz);
+
 	int err = skynet_socket_send(ctx, id, buffer, sz);
 	lua_pushboolean(L, !err);
 	return 1;
 }
 
+/**
+ * 使用低优先级队列发送数据
+ * lua: 接收 2 或者 3 个参数, 参数 1, socket id; 参数 2, 如果是 string, 那么无需传入参数 3, 如果是 lightuserdata 那么需要参数 3, 表示数据的大小.
+ * 0 个返回值.
+ */
 static int
 lsendlow(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+
+	// 获得参数 1
 	int id = luaL_checkinteger(L, 1);
+
+	// 获得参数 2, 3
 	int sz = 0;
 	void *buffer = get_buffer(L, 2, &sz);
+
 	skynet_socket_send_lowpriority(ctx, id, buffer, sz);
 	return 0;
 }
 
+/**
+ * bind 一个 socket fd
+ * lua: 接收 1 个参数, socket fd; 1 个返回值, socket id
+ */
 static int
 lbind(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
@@ -670,6 +849,10 @@ lbind(lua_State *L) {
 	return 1;
 }
 
+/**
+ * 打开一个 socket
+ * lua: 接收 1 个参数, socket id; 0 个返回值.
+ */
 static int
 lstart(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
@@ -678,6 +861,10 @@ lstart(lua_State *L) {
 	return 0;
 }
 
+/**
+ * 设置 socket 的 nodelay, 禁用 nagle 算法
+ * lua: 接收 1 个参数, socket id; 0 个返回值.
+ */
 static int
 lnodelay(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
@@ -686,11 +873,16 @@ lnodelay(lua_State *L) {
 	return 0;
 }
 
+/**
+ * 创建一个 udp socket
+ * lua: 接收 2 个参数, 参数 1, string 地址字符串; 参数 2, integer 端口号; 1 个返回值, socket id.
+ */
 static int
 ludp(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	size_t sz = 0;
 	const char * addr = lua_tolstring(L,1,&sz);
+
 	char tmp[sz];
 	int port = 0;
 	const char * host = NULL;
@@ -706,12 +898,18 @@ ludp(lua_State *L) {
 	return 1;
 }
 
+/**
+ * 设置指定 socket 的地址信息.
+ * lua: 接收 3 个参数, 参数 1, socket id; 参数 2, string 地址字符串; 参数 3, integer 端口号; 0 个返回值.
+ */
 static int
 ludp_connect(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
+
 	size_t sz = 0;
 	const char * addr = luaL_checklstring(L,2,&sz);
+
 	char tmp[sz];
 	int port = 0;
 	const char * host = NULL;
@@ -726,13 +924,21 @@ ludp_connect(lua_State *L) {
 	return 0;
 }
 
+/**
+ * 基于 udp 协议, 发送数据.
+ * lua: 接收 3或者4个参数, 参数 1, socket id; 参数 2, 地址信息; 参数 3, 如果是 string, 那么无需传入参数 4, 如果是 lightuserdata 那么需要参数 4, 表示数据的大小.
+ * 1 个返回值, boolean 类型, 操作成功返回 true
+ */
 static int
 ludp_send(lua_State *L) {
 	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
 	int id = luaL_checkinteger(L, 1);
+
 	const char * address = luaL_checkstring(L, 2);
+
 	int sz = 0;
 	void *buffer = get_buffer(L, 3, &sz);
+
 	int err = skynet_socket_udp_send(ctx, id, address, buffer, sz);
 
 	lua_pushboolean(L, !err);
@@ -740,13 +946,24 @@ ludp_send(lua_State *L) {
 	return 1;
 }
 
+/**
+ * 基于 udp 协议, 获得地址信息
+ * lua: 接收 1 个参数, 虽然是以 string 压入 lua, 但是实际是以二进制数据数据存储. 2 个返回值, 主机地址字符串, 端口.
+ */
 static int
 ludp_address(lua_State *L) {
+	// 获得参数 1
 	size_t sz = 0;
 	const uint8_t * addr = (const uint8_t *)luaL_checklstring(L, 1, &sz);
+
+	// 拿到端口数据
 	uint16_t port = 0;
 	memcpy(&port, addr+1, sizeof(uint16_t));
+
+	// 将一个16位数由网络字节顺序转换为主机字节顺序。
 	port = ntohs(port);
+
+	// 决定协议的类型, ipv4/ipv6
 	const void * src = addr+3;
 	char tmp[256];
 	int family;
@@ -758,18 +975,25 @@ ludp_address(lua_State *L) {
 		}
 		family = AF_INET6;
 	}
+
+	// 拿到地址的字符串格式
 	if (inet_ntop(family, src, tmp, sizeof(tmp)) == NULL) {
 		return luaL_error(L, "Invalid udp address");
 	}
+
+	// 压入返回结果
 	lua_pushstring(L, tmp);
 	lua_pushinteger(L, port);
 	return 2;
 }
 
-/// 注册函数到 socket 中
+/// 注册 socket 模块到 lua 中
 int
 luaopen_socketdriver(lua_State *L) {
+	// 检查调用它的内核是否是创建这个 Lua 状态机的内核。 以及调用它的代码是否使用了相同的 Lua 版本。 
+	// 同时也检查调用它的内核与创建该 Lua 状态机的内核 是否使用了同一片地址空间。
 	luaL_checkversion(L);
+
 	luaL_Reg l[] = {
 		{ "buffer", lnewbuffer },
 		{ "push", lpushbuffer },
@@ -784,6 +1008,8 @@ luaopen_socketdriver(lua_State *L) {
 		{ "unpack", lunpack },
 		{ NULL, NULL },
 	};
+
+	// 创建一张新的表，并把列表 l 中的函数注册进去。
 	luaL_newlib(L,l);	// 这时栈顶是 table
 
 	luaL_Reg l2[] = {
@@ -802,7 +1028,7 @@ luaopen_socketdriver(lua_State *L) {
 		{ NULL, NULL },
 	};
 
-	// upvalue 到栈顶
+	// 将注册表的 "skynet_context" 的值压入到栈顶, 在 service_snlua.c 的 _init 函数中在注册表中添加了 "skynet_context" 这个域的值.
 	lua_getfield(L, LUA_REGISTRYINDEX, "skynet_context");
 
 	// 获得栈顶值
@@ -811,8 +1037,11 @@ luaopen_socketdriver(lua_State *L) {
 		return luaL_error(L, "Init skynet context first");
 	}
 
-	// 所有函数共享 1 个 upvalue, 栈顶的 unvalue 会在注册完毕之后从栈中弹出
-	luaL_setfuncs(L,l2,1);
+	// void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup);
+	// 把数组 l 中的所有函数注册到栈顶的表中(该表在可选的 upvalue 之下, 见下面的解说).
+	// 若 nup 不为零， 所有的函数都共享 nup 个 upvalue。 这些值必须在调用之前，压在表之上。 这些值在注册完毕后都会从栈弹出。
+	// 根据上面对 luaL_setfuncs 的描述, 当前共享的 upvalue 就是 userdata(skynet_context).
+	luaL_setfuncs(L, l2, 1);
 
 	return 1;
 }

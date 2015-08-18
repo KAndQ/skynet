@@ -20,11 +20,11 @@ struct socket_server;
 
 /// 主要用于在操作 socket 时, 存储的操作 socket 的相关信息
 struct socket_message {
-	int id;            // socket id
+	int id;            // 当前发生操作的 socket id
 	uintptr_t opaque;  // 不透明的功能作用, 目前在 skynet_socket 中当作 skynet_context 的 handle 使用
 
     // for accept, ud is listen id; for data, ud is size of data.
-    // 对于 accpet, ud 是侦听的 id; 对于 data, ud 是数据的大小
+    // 对于 accpet, ud 是侦听的 id(连接到当前主机的 socket 的 id); 对于 data, ud 是数据的大小.
 	int ud;
 	char * data;
 };

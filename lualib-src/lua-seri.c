@@ -11,48 +11,56 @@
 #include <assert.h>
 #include <string.h>
 
-#define TYPE_NIL 0
-#define TYPE_BOOLEAN 1
-// hibits 0 false 1 true
-#define TYPE_NUMBER 2
+#define TYPE_NIL 0			// nil 类型
+#define TYPE_BOOLEAN 1		// boolean 类型, hibits 0 false 1 true
+
+#define TYPE_NUMBER 2		// 数字类型
+
 // hibits 0 : 0 , 1: byte, 2:word, 4: dword, 6: qword, 8 : double
-#define TYPE_NUMBER_ZERO 0
-#define TYPE_NUMBER_BYTE 1
-#define TYPE_NUMBER_WORD 2
-#define TYPE_NUMBER_DWORD 4
-#define TYPE_NUMBER_QWORD 6
-#define TYPE_NUMBER_REAL 8
+#define TYPE_NUMBER_ZERO 0	// 数字类型 0
+#define TYPE_NUMBER_BYTE 1	// 数字类型 1 个字节
+#define TYPE_NUMBER_WORD 2	// 数字类型 2 个字节
+#define TYPE_NUMBER_DWORD 4	// 数字类型 4 个字节
+#define TYPE_NUMBER_QWORD 6	// 数字类型 8 个字节
+#define TYPE_NUMBER_REAL 8	// 数字类型 8 个字节, 浮点数据
 
 #define TYPE_USERDATA 3
 #define TYPE_SHORT_STRING 4
+
 // hibits 0~31 : len
 #define TYPE_LONG_STRING 5
 #define TYPE_TABLE 6
 
 #define MAX_COOKIE 32
+
+/// 组合类型和值
 #define COMBINE_TYPE(t,v) ((t) | (v) << 3)
 
-#define BLOCK_SIZE 128
-#define MAX_DEPTH 32
+#define BLOCK_SIZE 128		// 数据块大小
+#define MAX_DEPTH 32		// 允许 table 的类型的最大深度
 
+/// 数据块节点
 struct block {
-	struct block * next;
-	char buffer[BLOCK_SIZE];
+	struct block * next;			// 下一个关联的节点
+	char buffer[BLOCK_SIZE];		// 存储数据
 };
 
+/// 写数据块队列
 struct write_block {
-	struct block * head;
-	struct block * current;
-	int len;
-	int ptr;
+	struct block * head;		// 队列头
+	struct block * current;		// 当前正在写入数据的 block
+	int len;		// 写入数据的总大小
+	int ptr;		// 记录 current block 写入数据的数量
 };
 
+/// 读数据 block
 struct read_block {
-	char * buffer;
-	int len;
-	int ptr;
+	char * buffer;	// 装载读取数据的起始指针
+	int len;		// 当前剩余的可读容量
+	int ptr;		// 记录当前已读数据的数量
 };
 
+/// 分配一个 struct block 数据对象
 inline static struct block *
 blk_alloc(void) {
 	struct block *b = skynet_malloc(sizeof(struct block));
@@ -60,18 +68,30 @@ blk_alloc(void) {
 	return b;
 }
 
+/**
+ * 写入 sz 大小的数据到 write_block 中, 注意, 对 buf 的数据进行了复制.
+ * @param b write_block
+ * @param buf 写入数据的起始指针
+ * @param sz 需要写入数据的大小
+ */
 inline static void
 wb_push(struct write_block *b, const void *buf, int sz) {
 	const char * buffer = buf;
+
+	// 没有可用的 block, 分配新的 block
 	if (b->ptr == BLOCK_SIZE) {
 _again:
 		b->current = b->current->next = blk_alloc();
 		b->ptr = 0;
 	}
+
+	// block 数据足够使用
 	if (b->ptr <= BLOCK_SIZE - sz) {
 		memcpy(b->current->buffer + b->ptr, buffer, sz);
 		b->ptr+=sz;
 		b->len+=sz;
+
+	// block 数据空间不足
 	} else {
 		int copy = BLOCK_SIZE - b->ptr;
 		memcpy(b->current->buffer + b->ptr, buffer, copy);
@@ -82,6 +102,7 @@ _again:
 	}
 }
 
+/// 初始化 write_block
 static void
 wb_init(struct write_block *wb , struct block *b) {
 	wb->head = b;
@@ -91,10 +112,11 @@ wb_init(struct write_block *wb , struct block *b) {
 	wb->ptr = 0;
 }
 
+/// 释放 write_block 的 block 资源
 static void
 wb_free(struct write_block *wb) {
 	struct block *blk = wb->head;
-	blk = blk->next;	// the first block is on stack
+	blk = blk->next;	// the first block is on stack, 保留第一个 block 在栈上
 	while (blk) {
 		struct block * next = blk->next;
 		skynet_free(blk);
@@ -106,6 +128,7 @@ wb_free(struct write_block *wb) {
 	wb->len = 0;
 }
 
+/// read_block 初始化 
 static void
 rball_init(struct read_block * rb, char * buffer, int size) {
 	rb->buffer = buffer;
@@ -113,6 +136,7 @@ rball_init(struct read_block * rb, char * buffer, int size) {
 	rb->ptr = 0;
 }
 
+/// 记录 read_block 读取了 sz 大小的数据, 返回剩余可读数据的指针地址
 static void *
 rb_read(struct read_block *rb, int sz) {
 	if (rb->len < sz) {
@@ -125,18 +149,21 @@ rb_read(struct read_block *rb, int sz) {
 	return rb->buffer + ptr;
 }
 
+/// write_block 压入 nil 数据
 static inline void
 wb_nil(struct write_block *wb) {
 	uint8_t n = TYPE_NIL;
 	wb_push(wb, &n, 1);
 }
 
+/// write_block 压入 boolean 数据
 static inline void
 wb_boolean(struct write_block *wb, int boolean) {
 	uint8_t n = COMBINE_TYPE(TYPE_BOOLEAN , boolean ? 1 : 0);
 	wb_push(wb, &n, 1);
 }
 
+/// write_block 压入 integer 数据
 static inline void
 wb_integer(struct write_block *wb, lua_Integer v) {
 	int type = TYPE_NUMBER;
@@ -171,6 +198,7 @@ wb_integer(struct write_block *wb, lua_Integer v) {
 	}
 }
 
+/// write_block 压入浮点数据
 static inline void
 wb_real(struct write_block *wb, double v) {
 	uint8_t n = COMBINE_TYPE(TYPE_NUMBER , TYPE_NUMBER_REAL);
@@ -178,6 +206,7 @@ wb_real(struct write_block *wb, double v) {
 	wb_push(wb, &v, sizeof(v));
 }
 
+/// write_block 压入指针数据
 static inline void
 wb_pointer(struct write_block *wb, void *v) {
 	uint8_t n = TYPE_USERDATA;
@@ -185,22 +214,26 @@ wb_pointer(struct write_block *wb, void *v) {
 	wb_push(wb, &v, sizeof(v));
 }
 
+/// write_block 压入字符串数据
 static inline void
 wb_string(struct write_block *wb, const char *str, int len) {
+	// 存储小字符串数据
 	if (len < MAX_COOKIE) {
 		uint8_t n = COMBINE_TYPE(TYPE_SHORT_STRING, len);
 		wb_push(wb, &n, 1);
 		if (len > 0) {
 			wb_push(wb, str, len);
 		}
+
+	// 存储大字符串数据
 	} else {
 		uint8_t n;
-		if (len < 0x10000) {
+		if (len < 0x10000) {	// 字符串长度 2 个字节之内
 			n = COMBINE_TYPE(TYPE_LONG_STRING, 2);
 			wb_push(wb, &n, 1);
 			uint16_t x = (uint16_t) len;
 			wb_push(wb, &x, 2);
-		} else {
+		} else {				// 字符串长度 4 个字节之内
 			n = COMBINE_TYPE(TYPE_LONG_STRING, 4);
 			wb_push(wb, &n, 1);
 			uint32_t x = (uint32_t) len;
@@ -256,14 +289,35 @@ wb_table_hash(lua_State *L, struct write_block * wb, int index, int depth, int a
 
 static void
 wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
+	// 记录当前是 table 类型
 	uint8_t n = COMBINE_TYPE(TYPE_TABLE, 0);
 	wb_push(wb, &n, 1);
+
+	// 目前栈顶是个函数, 之后才是 table, 现在对这个 table 做一个副本, 压入到栈顶
 	lua_pushvalue(L, index);
+
+	// 执行函数, 这时函数的 3 个返回值压栈, 参考下面的 <<__pairs 介绍>>
+	// 函数返回值将按正序压栈（第一个返回值首先压栈）， 因此在调用结束后，最后一个返回值将被放在栈顶。
 	lua_call(L, 1, 3);
+
+	// 这时栈结构: next函数(-1), index表(-2), (-3) ...
+	// 这时栈结构: nil(-1), index表(-2), next函数(-3) ...
+
 	for(;;) {
+		// index 表位于栈顶
 		lua_pushvalue(L, -2);
+
+		// nil 位于栈顶
 		lua_pushvalue(L, -2);
+
+		// 这时栈结构: nil (-1), index表(-2), nil(-3), index表(-4), next函数(-5) ...
+
+		// void lua_copy (lua_State *L, int fromidx, int toidx);
+		// 从索引 fromidx 处复制一个值到一个有效索引 toidx 处，覆盖那里的原有值。 不会影响其它位置的值。
 		lua_copy(L, -5, -3);
+
+		// 这时栈结构: next函数(-1), index表(-2), next函数(-3), index表(-4), next函数(-5) ...
+
 		lua_call(L, 2, 2);
 		int type = lua_type(L, -2);
 		if (type == LUA_TNIL) {
@@ -277,12 +331,22 @@ wb_table_metapairs(lua_State *L, struct write_block *wb, int index, int depth) {
 	wb_nil(wb);
 }
 
+/// write_block 压入 table 类型数据
 static void
 wb_table(lua_State *L, struct write_block *wb, int index, int depth) {
 	luaL_checkstack(L, LUA_MINSTACK, NULL);
 	if (index < 0) {
 		index = lua_gettop(L) + index + 1;
 	}
+
+	// __pairs 介绍
+	// 如果 t 有元方法 __pairs， 以 t 为参数调用它，并返回其返回的前三个值。
+	// 否则，返回三个值：next 函数， 表 t，以及 nil。
+
+	// int luaL_getmetafield (lua_State *L, int obj, const char *e);
+	// 将索引 obj 处对象的元表中 e 域的值压栈。 如果该对象没有元表，或是该元表没有相关域， 此函数什么也不会压栈并返回 LUA_TNIL。
+	// 如果返回值不是 LUA_TNIL, 那么这时栈顶是 __pairs 对应的值, 是个函数, 现在可以再去具体的查看 wb_table_metapairs 函数。
+
 	if (luaL_getmetafield(L, index, "__pairs") != LUA_TNIL) {
 		wb_table_metapairs(L, wb, index, depth);
 	} else {
@@ -291,12 +355,17 @@ wb_table(lua_State *L, struct write_block *wb, int index, int depth) {
 	}
 }
 
+/// 将一个 lua 类型序列化存储
 static void
 pack_one(lua_State *L, struct write_block *b, int index, int depth) {
+
+	// 深度检测, 主要用于 table 类型
 	if (depth > MAX_DEPTH) {
 		wb_free(b);
 		luaL_error(L, "serialize can't pack too depth table");
 	}
+
+	// 根据 type 选择各自的方式序列化存储
 	int type = lua_type(L,index);
 	switch(type) {
 	case LUA_TNIL:
