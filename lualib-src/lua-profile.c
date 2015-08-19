@@ -151,19 +151,24 @@ luaopen_profile(lua_State *L) {
 	lua_newtable(L);	// table thread->start time
 	lua_newtable(L);	// table thread->total time
 
-	lua_newtable(L);	// weak table
+	lua_newtable(L);	// weak table, 弱表, 只元素内部为弱引用的表
+	// 键值都是弱引用
 	lua_pushliteral(L, "kv");
 	lua_setfield(L, -2, "__mode");
 
 	lua_pushvalue(L, -1);
-	lua_setmetatable(L, -3); 
-	lua_setmetatable(L, -3);
+	lua_setmetatable(L, -3);	// 设置 table thread->start time 的原表
+	lua_setmetatable(L, -3);	// 设置 table thread->total time 的原表
 
 	lua_pushnil(L);
-	luaL_setfuncs(L,l,3);
+	luaL_setfuncs(L,l,3);		// 函数关联 3 个 upvalue
+	// upvalue[1] = table thread->start time
+	// upvalue[2] = table thread->total time
+	// upvalue[3] = nil, 这里是 nil, 是因为针对不同的闭包分别设置各自的 upvalue
 
 	int libtable = lua_gettop(L);
 
+	// 获得 lua 标准库的 coroutine.resume 函数
 	lua_getglobal(L, "coroutine");
 	lua_getfield(L, -1, "resume");
 
@@ -171,21 +176,27 @@ luaopen_profile(lua_State *L) {
 	if (co_resume == NULL)
 		return luaL_error(L, "Can't get coroutine.resume");
 	lua_pop(L,1);
+
+	// 设置 resume 的第 3 个 upvalue 是 co_resume
 	lua_getfield(L, libtable, "resume");
 	lua_pushcfunction(L, co_resume);
 	lua_setupvalue(L, -2, 3);
 	lua_pop(L,1);
 
+	// 获得 lua 标准库的 coroutine.yield 函数
 	lua_getfield(L, -1, "yield");
 
 	lua_CFunction co_yield = lua_tocfunction(L, -1);
 	if (co_yield == NULL)
 		return luaL_error(L, "Can't get coroutine.yield");
 	lua_pop(L,1);
+
+	// 设置 resume 的第 3 个 upvalue 是 co_yield
 	lua_getfield(L, libtable, "yield");
 	lua_pushcfunction(L, co_yield);
 	lua_setupvalue(L, -2, 3);
 
+	// 删除 libtable 之上的所有数据
 	lua_settop(L, libtable);
 
 	return 1;
