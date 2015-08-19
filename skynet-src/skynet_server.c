@@ -938,6 +938,7 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 
 	// 参数过滤, 这个函数会根据 type 的值申请新的内存空间.
 	// issue: 如果对 data 进行了复制, 那么老的 data 资源由谁来管理呢?
+	// #a-issue: 这个需要视情况来决定, 因为有些时候这个 data 指针的数据并不由 skynet 框架管理, 例如 lua 的字符串.
 	_filter_args(context, type, &session, (void **)&data, &sz);
 
 	// 如果 source 为 0, 表示用 context 发送

@@ -8,9 +8,13 @@
 #include <mach/mach.h>
 #endif
 
+// 纳秒
 #define NANOSEC 1000000000
+
+// 微秒
 #define MICROSEC 1000000
 
+/// 获得时间, 以秒为单位
 static double
 get_time() {
 #if  !defined(__APPLE__)
@@ -35,6 +39,7 @@ get_time() {
 #endif
 }
 
+/// 当前的时间和 start 时间计算时间差
 static inline double 
 diff_time(double start) {
 	double now = get_time();
