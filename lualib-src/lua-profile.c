@@ -14,7 +14,7 @@
 // 微秒
 #define MICROSEC 1000000
 
-/// 获得时间, 以秒为单位
+/// 获得当前时间, 以秒为单位
 static double
 get_time() {
 #if  !defined(__APPLE__)
@@ -50,17 +50,25 @@ diff_time(double start) {
 	}
 }
 
+/**
+ * 关联 L 线程, 启动 profile
+ * lua: 0 个接收参数; 0 个返回值.
+ */
 static int
 lstart(lua_State *L) {
+	// 从 thread->total table 中试图拿到以 L 为键对应的值
 	lua_pushthread(L);
 	lua_rawget(L, lua_upvalueindex(2));
 	if (!lua_isnil(L, -1)) {
 		return luaL_error(L, "Thread %p start profile more than once", lua_topointer(L, 1));
 	}
+
+	// total_time_table[L] = 0
 	lua_pushthread(L);
 	lua_pushnumber(L, 0);
 	lua_rawset(L, lua_upvalueindex(2));
 
+	// start_time_table[L] = 当前时间
 	lua_pushthread(L);
 	lua_pushnumber(L, get_time());
 	lua_rawset(L, lua_upvalueindex(1));
@@ -68,20 +76,30 @@ lstart(lua_State *L) {
 	return 0;
 }
 
+/**
+ * 关联 L 线程, 启动 profile
+ * lua: 0 个接收参数; 1 个返回值, 当前 L 线程的 total time
+ */
 static int
 lstop(lua_State *L) {
+	// start_time = start_time_table[L]
+	// ti = diff_time(start_time)
 	lua_pushthread(L);
 	lua_rawget(L, lua_upvalueindex(1));
 	luaL_checktype(L, -1, LUA_TNUMBER);
 	double ti = diff_time(lua_tonumber(L, -1));
+
+	// total_time = total_time_table[L]
 	lua_pushthread(L);
 	lua_rawget(L, lua_upvalueindex(2));
 	double total_time = lua_tonumber(L, -1);
 
+	// start_time_table[L] = nil
 	lua_pushthread(L);
 	lua_pushnil(L);
 	lua_rawset(L, lua_upvalueindex(1));
 
+	// total_time_table[L] = nil
 	lua_pushthread(L);
 	lua_pushnil(L);
 	lua_rawset(L, lua_upvalueindex(2));
@@ -91,49 +109,64 @@ lstop(lua_State *L) {
 	return 1;
 }
 
+/**
+ * 继续线程的运行
+ * lua: 接收 1 个参数, 参数 1, 需要继续运行的线程; 返回值同 coroutine.resume
+ */
 static int
 lresume(lua_State *L) {
 	lua_pushvalue(L,1);
 	lua_rawget(L, lua_upvalueindex(2));
-	if (lua_isnil(L, -1)) {		// check total time
+	if (lua_isnil(L, -1)) {		// check total time, 检测 total time
 		lua_pop(L,1);
 	} else {
 		lua_pop(L,1);
+
+		// start_time_table[lua_pushvalue(L, 1)] = ti
+		// 重新设置 start time
 		lua_pushvalue(L,1);
 		double ti = get_time();
 		lua_pushnumber(L, ti);
-		lua_rawset(L, lua_upvalueindex(1));	// set start time
+		lua_rawset(L, lua_upvalueindex(1));	// set start time, 设置 start time
 	}
 
+	// 运行 lua 原生库的 resume 方法
 	lua_CFunction co_resume = lua_tocfunction(L, lua_upvalueindex(3));
-
 	return co_resume(L);
 }
 
+/**
+ * 挂起正在调用的线程
+ * lua: 接收 0 个参数; 返回值同 coroutine.yield
+ */
 static int
 lyield(lua_State *L) {
 	lua_pushthread(L);
-	lua_rawget(L, lua_upvalueindex(2));	// check total time
+	lua_rawget(L, lua_upvalueindex(2));	// check total time, 检测 total time
 	if (lua_isnil(L, -1)) {
 		lua_pop(L,1);
 	} else {
+		// ti = total_time_table[L]
 		double ti = lua_tonumber(L, -1);
 		lua_pop(L,1);
 
+		// start = start_time_table[L]
 		lua_pushthread(L);
 		lua_rawget(L, lua_upvalueindex(1));
 		double starttime = lua_tonumber(L, -1);
 		lua_pop(L,1);
 
+		// 计算 total time
 		ti += diff_time(starttime);
 
+		// total_time_table[L] = ti
 		lua_pushthread(L);
 		lua_pushnumber(L, ti);
 		lua_rawset(L, lua_upvalueindex(2));
 	}
 
+	// 运行 lua 原生库的 yield 方法
 	lua_CFunction co_yield = lua_tocfunction(L, lua_upvalueindex(3));
-
 	return co_yield(L);
 }
 
