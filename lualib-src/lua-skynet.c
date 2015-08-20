@@ -11,12 +11,6 @@
 #include <string.h>
 #include <assert.h>
 
-struct snlua {
-	lua_State * L;
-	struct skynet_context * ctx;
-	const char * preload;
-};
-
 /// 错误处理函数
 static int
 traceback (lua_State *L) {

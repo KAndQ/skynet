@@ -7,11 +7,12 @@ local pairs = pairs
 local pcall = pcall
 
 local profile = require "profile"
-
 coroutine.resume = profile.resume
 coroutine.yield = profile.yield
 
-local proto = {}	-- 用于注册 [协议字符串] 和 [注册协议ID] 的映射表.
+-- 原型记录, 记录 proto[class.name] = class; proto[class.id] = class;
+local proto = {}
+
 local skynet = {
 	-- read skynet.h, 参考 skynet.h 的消息类别定义
 	PTYPE_TEXT = 0,
@@ -22,16 +23,16 @@ local skynet = {
 	PTYPE_HARBOR = 5,
 	PTYPE_SOCKET = 6,
 	PTYPE_ERROR = 7,
-	PTYPE_QUEUE = 8,	-- used in deprecated mqueue, use skynet.queue instead
+	PTYPE_QUEUE = 8,	-- used in deprecated mqueue, use skynet.queue instead, 不赞成使用 mqueue, 建议使用 skynet.queue 代替
 	PTYPE_DEBUG = 9,
 	PTYPE_LUA = 10,
 	PTYPE_SNAX = 11,
 }
 
--- code cache
+-- code cache, 在 service_snlua.c 中初始化
 skynet.cache = require "skynet.codecache"
 
---[===[
+--[[
 例如你可以注册一个以文本方式编码消息的消息类别。通常用 C 编写的服务更容易解析文本消息。
 skynet 已经定义了这种消息类别为 skynet.PTYPE_TEXT，但默认并没有注册到 lua 中使用。
 
@@ -52,7 +53,8 @@ unpack 函数接收一个 lightuserdata 和一个整数 。即上面提到的 me
 lua 无法直接处理 C 指针，所以必须使用额外的 C 库导入函数来解码。skynet.tostring 就是这样的一个函数，它将这个 C 指针和长度翻译成 lua 的 string。
 
 接下来你可以使用 skynet.dispatch 注册 text 类别的处理方法了。当然，直接在 skynet.register_protocol 时传入 dispatch 函数也可以。
---]===]
+--]]
+
 -- 在 skynet 中注册新的消息类别.
 -- @param class 里面的字段参考上面的注释
 -- @return nil
@@ -65,9 +67,15 @@ function skynet.register_protocol(class)
 	proto[id] = class
 end
 
-local session_id_coroutine = {}			-- session 和 coroutine 的映射关系表
-local session_coroutine_id = {}			-- coroutine 和 session 的映射关系表
-local session_coroutine_address = {}	-- coroutine 和 address(source) 的映射关系表
+-- session 和 coroutine 的映射关系表, 键是 session, 值是 coroutine
+local session_id_coroutine = {}
+
+-- coroutine 和 session 的映射关系表, 键是 coroutine, 值是 session
+local session_coroutine_id = {}
+
+-- coroutine 和 address 的映射关系表, 键是 coroutine, 值是 address
+local session_coroutine_address = {}
+
 local session_response = {}
 local unresponse = {}
 
@@ -83,11 +91,13 @@ local fork_queue = {}
 -- suspend is function
 local suspend
 
+-- 将字符串格式成 0x123456 这种 16 进制的格式
 local function string_to_handle(str)
 	return tonumber("0x" .. string.sub(str , 2))
 end
 
 ----- monitor exit
+----- 监视器退出
 
 local function dispatch_error_queue()
 	local session = table.remove(error_queue,1)
@@ -119,6 +129,7 @@ local function _error_dispatch(error_session, error_source)
 end
 
 -- coroutine reuse
+-- 协程复用
 
 local coroutine_pool = {}
 local coroutine_yield = coroutine.yield
@@ -166,13 +177,17 @@ local function release_watching(address)
 end
 
 -- suspend is local function
+-- syspend 是一个私有函数
 function suspend(co, result, command, param, size)
+	-- 如果协程运行发生错误, 发送错误信息给消息源
 	if not result then
+		-- 拿到保存的 session 
 		local session = session_coroutine_id[co]
-		if session then -- coroutine may fork by others (session is nil)
+		if session then -- coroutine may fork by others (session is nil), co 可能被其他协程 fork(session 为 nil)
 			local addr = session_coroutine_address[co]
 			if session ~= 0 then
 				-- only call response error
+				-- 只调用相应错误信息
 				c.send(addr, skynet.PTYPE_ERROR, session, "")
 			end
 			session_coroutine_id[co] = nil
@@ -180,6 +195,7 @@ function suspend(co, result, command, param, size)
 		end
 		error(debug.traceback(co,tostring(command)))
 	end
+
 	if command == "CALL" then
 		session_id_coroutine[param] = co
 	elseif command == "SLEEP" then
@@ -191,12 +207,15 @@ function suspend(co, result, command, param, size)
 		if param == nil or session_response[co] then
 			error(debug.traceback(co))
 		end
+
+		-- 标记已经响应了
 		session_response[co] = true
 		local ret
 		if not dead_service[co_address] then
 			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) ~= nil
 			if not ret then
 				-- If the package is too large, returns nil. so we should report error back
+				-- 如果包太大, 返回 nil. 所以我们应该报告错误.
 				c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 			end
 		elseif size ~= nil then
@@ -254,6 +273,7 @@ function suspend(co, result, command, param, size)
 		return suspend(co, coroutine.resume(co, response))
 	elseif command == "EXIT" then
 		-- coroutine exit
+		-- 协程退出
 		local address = session_coroutine_address[co]
 		release_watching(address)
 		session_coroutine_id[co] = nil
@@ -261,9 +281,11 @@ function suspend(co, result, command, param, size)
 		session_response[co] = nil
 	elseif command == "QUIT" then
 		-- service exit
+		-- 服务退出
 		return
 	elseif command == nil then
 		-- debug trace
+		-- 调试追踪
 		return
 	else
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
