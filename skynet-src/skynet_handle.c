@@ -234,7 +234,7 @@ skynet_handle_findname(const char * name) {
 			break;
 		}
 
-		// 关键的就在这里了
+		// 关键的就在这里了, 决定往那个方向查询
 		if (c<0) {
 			begin = mid + 1;
 		} else {

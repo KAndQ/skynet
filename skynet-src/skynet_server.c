@@ -347,7 +347,7 @@ dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
 	// 拿到数据的大小
 	size_t sz = msg->sz & MESSAGE_TYPE_MASK;
 
-	// 如果当前服务有日志文件, 将信息输出到日志文件中
+	// 如果当前服务有日志文件, 将信息输出到日志文件中, 这是每个服务特有的日志文件
 	if (ctx->logfile) {
 		skynet_log_output(ctx->logfile, msg->source, type, msg->session, msg->data, sz);
 	}
@@ -550,6 +550,7 @@ cmd_reg(struct skynet_context * context, const char * param) {
 		return context->result;
 
 	// 在本地服务给 context 注册名字, 名字开头符号必须是'.'
+	// 注意: 注册的名字是已经省略掉前面的 . 符号了
 	} else if (param[0] == '.') {
 		return skynet_handle_namehandle(context->handle, param + 1);
 

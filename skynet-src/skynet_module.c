@@ -169,7 +169,7 @@ skynet_module_query(const char * name) {
 	SPIN_LOCK(M)
 
 	// 再查询一次, 判断是否其他线程有加载这个模块
-	result = _query(name); // double check
+	result = _query(name); // double check, 双重检测
 	
 	// 保证空间足够, 创建 skynet_module, 并加入到集合中
 	if (result == NULL && M->count < MAX_MODULE_TYPE) {

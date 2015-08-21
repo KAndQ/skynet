@@ -15,6 +15,7 @@ struct snlua {
 };
 
 // LUA_CACHELIB may defined in patched lua for shared proto
+// LUA_CACHELIB 可能已经在 lua 的共享原型补丁中定义
 #ifdef LUA_CACHELIB
 
 #define codecache luaopen_cache
@@ -44,6 +45,7 @@ static int
 traceback (lua_State *L) {
 	const char *msg = lua_tostring(L, 1);
 	if (msg)
+		// 从当前位置将回溯信息压栈
 		luaL_traceback(L, L, msg, 1);
 	else {
 		lua_pushliteral(L, "(no error message)");
