@@ -53,12 +53,14 @@ traceback (lua_State *L) {
 	return 1;
 }
 
+/// 报告错误给 launcher 服务
 static void
 _report_launcher_error(struct skynet_context *ctx) {
 	// sizeof "ERROR" == 5
 	skynet_sendname(ctx, 0, ".launcher", PTYPE_TEXT, 0, "ERROR", 5);
 }
 
+/// 获取配置数据
 static const char *
 optstring(struct skynet_context *ctx, const char *key, const char * str) {
 	const char * ret = skynet_command(ctx, "GETENV", key);
@@ -132,19 +134,27 @@ _launch(struct skynet_context * context, void *ud, int type, int session, uint32
 	return 0;
 }
 
+/// 初始化 struct snlua
 int
 snlua_init(struct snlua *l, struct skynet_context *ctx, const char * args) {
+	// 复制参数数据
 	int sz = strlen(args);
 	char * tmp = skynet_malloc(sz);
 	memcpy(tmp, args, sz);
-	skynet_callback(ctx, l , _launch);
+
+	skynet_callback(ctx, l, _launch);
+
+	// 获取当前 skynet_context 的 handle
 	const char * self = skynet_command(ctx, "REG", NULL);
 	uint32_t handle_id = strtoul(self+1, NULL, 16);
+	
 	// it must be first message
-	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY,0, tmp, sz);
+	// 这必须是第一个消息
+	skynet_send(ctx, 0, handle_id, PTYPE_TAG_DONTCOPY, 0, tmp, sz);
 	return 0;
 }
 
+/// 创建 struct snlua
 struct snlua *
 snlua_create(void) {
 	struct snlua * l = skynet_malloc(sizeof(*l));
@@ -153,17 +163,20 @@ snlua_create(void) {
 	return l;
 }
 
+/// 释放 struct snlua
 void
 snlua_release(struct snlua *l) {
 	lua_close(l->L);
 	skynet_free(l);
 }
 
+/// struct snlua 对于信号量处理
 void
 snlua_signal(struct snlua *l, int signal) {
 	skynet_error(l->ctx, "recv a signal %d", signal);
 #ifdef lua_checksig
 	// If our lua support signal (modified lua version by skynet), trigger it.
+	// 如果我们的 lua 支持信号(修改的 lua 版本), 触发它.
 	skynet_sig_L = l->L;
 #endif
 }

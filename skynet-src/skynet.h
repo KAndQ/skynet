@@ -36,7 +36,9 @@
 #define PTYPE_RESERVED_LUA 10
 #define PTYPE_RESERVED_SNAX 11
 
-#define PTYPE_TAG_DONTCOPY 0x10000      // 分配新的内存空间, 对发送的数据复制
+// 分配新的内存空间, 对发送的数据复制.
+// 这个标记决定在服务间 send 消息的时候是否需要多发送的数据进行复制.
+#define PTYPE_TAG_DONTCOPY 0x10000
 #define PTYPE_TAG_ALLOCSESSION 0x20000  // 分配新的 session 进行发送
 
 // 关于 skynet_context 数据结构, 会在 skynet_server.c 中详细说明.
