@@ -394,8 +394,8 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 	if (ctx == NULL) {
 		struct drop_t d = { handle };
 
-		// 1. 如果 q 没有打 release 标记, 那么 skynet_mq_release 会将 q 再压入到 global_queue 里面.
-		// 2. 如果 q 打了 release 标记, 那么 skynet_mq_release 会将 q 里面的 message 资源全部释放掉, 同时释放掉 q 自身
+		// 1. 如果 q 没有打 release 标记, 那么 skynet_mq_release 会将 message_queue 再压入到 global_queue 里面.
+		// 2. 如果 q 打了 release 标记, 那么 skynet_mq_release 会将 message_queue 里面的 skynet_message 资源全部释放掉, 同时释放掉 message_queue 自身
 		skynet_mq_release(q, drop_message, &d);
 
 		// 弹出下一个链表头元素
@@ -417,7 +417,7 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 			return skynet_globalmq_pop();
 
 		// 决定接下来循环的次数
-		} else if (i == 0 && weight >= 0) {		// 弹出消息成功
+		} else if (i == 0 /* 第一次循环 */ && weight >= 0 /* 值要有意义 */ ) {		// 弹出消息成功
 			n = skynet_mq_length(q);
 			n >>= weight;	// >> 每右移一位表示除 2
 		}
@@ -447,13 +447,14 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 	// 保证处理 context->queue 和 q 是相同的
 	assert(q == ctx->queue);
 
-	// 弹出下次使用的 message_queue
+	// 弹出下次使用的 message_queue, 或者继续使用当前的 message_queue
+	// 这里决定如果当前的 message_queue 消息没有处理完, 接下来会如何处理
 	struct message_queue * nq = skynet_globalmq_pop();
 	if (nq) {
 		// If global mq is not empty, push q back, and return next queue (nq)
 		// Else (global mq is empty or block, don't push q back, and return q again (for next dispatch)
-		// 如果全局的 mq 非空, 再将 q 放入到链表的尾部, 返回下一个 queue(nq)
-		// 否则如果全局的 mq 是空, 将不再把 q 压入到尾部, 随后再一次返回 q(为下一次 dispatch)
+		// 如果 global_queue 不是空的, 再将当前的 message_queue(q) 放入到链表的尾部, 返回下一个 message_queue(nq)
+		// 否则如果 global_queue 是空, 将不再把 message_queue(q) 压入到尾部, 随后再一次返回 message(q)(为下一次 dispatch)
 		skynet_globalmq_push(q);
 		q = nq;
 	}

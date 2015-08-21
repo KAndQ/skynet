@@ -42,13 +42,13 @@ struct message_queue * skynet_globalmq_pop(void);
  */
 struct message_queue * skynet_mq_create(uint32_t handle);
 
-/// 将 q 标记为需要释放
+/// 将 message_queue 标记为需要释放
 void skynet_mq_mark_release(struct message_queue *q);
 
 /// 释放 skynet_message 的接口声明
 typedef void (*message_drop)(struct skynet_message *, void *);
 
-/// 释放 q 的全部资源, 如果 q 之前已经标记了 release, 那么所有资源都将被释; 否则压入到 global_queue 中
+/// 释放 message_queue 的全部资源, 如果 message_queue 之前已经标记了 release, 那么所有资源都将被释; 否则压入到 global_queue 中
 void skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud);
 
 /// 得到 message_queue 的 handle
@@ -64,7 +64,7 @@ uint32_t skynet_mq_handle(struct message_queue *);
  */
 int skynet_mq_pop(struct message_queue *q, struct skynet_message *message);
 
-/// 将 message 压入到 q 中
+/// 将 skynet_message 压入到 message_queue 中
 void skynet_mq_push(struct message_queue *q, struct skynet_message *message);
 
 // return the length of message queue, for debug
@@ -75,7 +75,7 @@ int skynet_mq_length(struct message_queue *q);
 // 注意, 如果当超载量不为 0 的时候, 调用这个函数会将超载量设置为 0.
 int skynet_mq_overload(struct message_queue *q);
 
-/// 当前节点的消息队列初始化
+/// 当前节点的 global_queue 初始化
 void skynet_mq_init();
 
 #endif

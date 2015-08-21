@@ -125,7 +125,10 @@ static int
 _launch(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz) {
 	assert(type == 0 && session == 0);
 	struct snlua *l = ud;
+
+	// 注意, 在接收 1 次消息后, 马上取消消息处理函数
 	skynet_callback(context, NULL, NULL);
+
 	int err = _init(l, context, msg, sz);
 	if (err) {
 		skynet_command(context, "EXIT", NULL);

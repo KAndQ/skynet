@@ -143,7 +143,7 @@ thread_monitor(void *p) {
 		// idle
 		for (i = 0; i < 5; i++) {
 			CHECK_ABORT
-			sleep(1);	// 1ms
+			sleep(1);	// 1s
 		}
 	}
 
