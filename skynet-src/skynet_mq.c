@@ -363,7 +363,7 @@ skynet_mq_release(struct message_queue *q, message_drop drop_func, void *ud) {
 		SPIN_UNLOCK(q)
 		_drop_queue(q, drop_func, ud);
 
-	// 如果 q 没有标记需要释放, 只将 q 压入到 global_queue 中去
+	// 如果 q 没有标记需要释放, 只将 q 压入到 global_queue 中去, 等待打了标记的时候才会执行删除
 	} else {
 		skynet_globalmq_push(q);
 		SPIN_UNLOCK(q)

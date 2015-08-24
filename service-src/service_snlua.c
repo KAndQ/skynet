@@ -74,39 +74,60 @@ static int
 _init(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz) {
 	lua_State *L = l->L;
 	l->ctx = ctx;
-	lua_gc(L, LUA_GCSTOP, 0);
-	lua_pushboolean(L, 1);  /* signal for libraries to ignore env. vars. */
+
+	// int lua_gc (lua_State *L, int what, int data);
+	// 控制垃圾收集器。根据参数 what 发起不同的任务.
+	lua_gc(L, LUA_GCSTOP, 0);	// 停止垃圾收集器
+
+	// 注册表添加 LUA_NOENV = ture
+	lua_pushboolean(L, 1);  /* signal for libraries to ignore env. vars. 标记库忽略环境变量 */
 	lua_setfield(L, LUA_REGISTRYINDEX, "LUA_NOENV");
+	
+	// 打开指定状态机中的所有 Lua 标准库。
 	luaL_openlibs(L);
+
+	// 注册表添加 skynet_context = ctx(lightuserdata)
 	lua_pushlightuserdata(L, ctx);
 	lua_setfield(L, LUA_REGISTRYINDEX, "skynet_context");
+
+	// 添加 "skynet.codecache" 模块
 	luaL_requiref(L, "skynet.codecache", codecache , 0);
 	lua_pop(L,1);
 
+	// 设置 LUA_PATH 全局变量
 	const char *path = optstring(ctx, "lua_path","./lualib/?.lua;./lualib/?/init.lua");
 	lua_pushstring(L, path);
 	lua_setglobal(L, "LUA_PATH");
+
+	// 设置 LUA_CPATH 全局变量
 	const char *cpath = optstring(ctx, "lua_cpath","./luaclib/?.so");
 	lua_pushstring(L, cpath);
 	lua_setglobal(L, "LUA_CPATH");
+
+	// 设置 LUA_SERVICE 全局变量
 	const char *service = optstring(ctx, "luaservice", "./service/?.lua");
 	lua_pushstring(L, service);
 	lua_setglobal(L, "LUA_SERVICE");
+
+	// 设置 LUA_PRELOAD 全局变量
 	const char *preload = skynet_command(ctx, "GETENV", "preload");
 	lua_pushstring(L, preload);
 	lua_setglobal(L, "LUA_PRELOAD");
 
+	// 压入错误跟踪函数
 	lua_pushcfunction(L, traceback);
 	assert(lua_gettop(L) == 1);
 
+	// 加载 loader.lua 的代码块, 但没有运行.
 	const char * loader = optstring(ctx, "lualoader", "./lualib/loader.lua");
-
 	int r = luaL_loadfile(L,loader);
 	if (r != LUA_OK) {
 		skynet_error(ctx, "Can't load %s : %s", loader, lua_tostring(L, -1));
 		_report_launcher_error(ctx);
 		return 1;
 	}
+
+	// 压入参数, 执行 loader.lua 代码块
 	lua_pushlstring(L, args, sz);
 	r = lua_pcall(L,1,0,1);
 	if (r != LUA_OK) {
@@ -114,9 +135,11 @@ _init(struct snlua *l, struct skynet_context *ctx, const char * args, size_t sz)
 		_report_launcher_error(ctx);
 		return 1;
 	}
+
+	// 清空栈
 	lua_settop(L,0);
 
-	lua_gc(L, LUA_GCRESTART, 0);
+	lua_gc(L, LUA_GCRESTART, 0);	// 重启垃圾收集器
 
 	return 0;
 }

@@ -313,7 +313,7 @@ bootstrap(struct skynet_context * logger, const char * cmdline) {
 	int sz = strlen(cmdline);
 	char name[sz+1];
 	char args[sz+1];
-	sscanf(cmdline, "%s %s", name, args);
+	sscanf(cmdline, "%s %s", name, args);	// snlua bootstrap
 	struct skynet_context *ctx = skynet_context_new(name, args);
 	if (ctx == NULL) {
 		skynet_error(NULL, "Bootstrap error : %s\n", cmdline);

@@ -261,7 +261,7 @@ delete_context(struct skynet_context *ctx) {
 	// 关联的模块实例资源释放
 	skynet_module_instance_release(ctx->mod, ctx->instance);
 
-	// 标记关联的 queue 为释放状态
+	// 标记关联的 message_queue 为释放状态, message_queue 的实际删除会在 skynet_context_message_dispatch 中执行
 	skynet_mq_mark_release(ctx->queue);
 
 	CHECKCALLING_DESTROY(ctx)
