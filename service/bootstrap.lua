@@ -5,6 +5,7 @@ require "skynet.manager"	-- import skynet.launch, ...
 skynet.start(function()
 	local standalone = skynet.getenv "standalone"
 
+	-- 开启 launcher.lua 服务
 	local launcher = assert(skynet.launch("snlua","launcher"))
 	skynet.name(".launcher", launcher)
 

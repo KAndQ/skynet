@@ -491,7 +491,7 @@ skynet_queryname(struct skynet_context * context, const char * name) {
 	return 0;
 }
 
-/// 撤销 handle. 如果 handle == 0, 那么撤销的是 context, 否则撤销 handle.
+/// 撤销 handle 对应的 skynet_context. 如果 handle == 0, 那么撤销的是传入的 skynet_context.
 static void
 handle_exit(struct skynet_context * context, uint32_t handle) {
 

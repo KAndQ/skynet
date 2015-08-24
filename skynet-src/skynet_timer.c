@@ -24,8 +24,8 @@ typedef void (*timer_execute_func)(void *ud,void *arg);
 #define TIME_NEAR (1 << TIME_NEAR_SHIFT)	// 256
 #define TIME_LEVEL_SHIFT 6
 #define TIME_LEVEL (1 << TIME_LEVEL_SHIFT)	// 64
-#define TIME_NEAR_MASK (TIME_NEAR-1)		// 0xFF(11111111)
-#define TIME_LEVEL_MASK (TIME_LEVEL-1)		// 0x3F(00111111)
+#define TIME_NEAR_MASK (TIME_NEAR-1)		// 0xFF(1111 1111)
+#define TIME_LEVEL_MASK (TIME_LEVEL-1)		// 0x3F(0011 1111)
 
 // 计时器时间, 记录是哪个 handle 定制的计时器, 与一个 timer_node 关联
 struct timer_event {
@@ -253,7 +253,7 @@ dispatch_list(struct timer_node *current) {
 		message.source = 0;
 		message.session = event->session;
 		message.data = NULL;
-		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
+		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;	// 响应类型!!!
 
 		skynet_context_push(event->handle, &message);
 		
@@ -344,7 +344,7 @@ skynet_timeout(uint32_t handle, int time, int session) {
 		message.source = 0;
 		message.session = session;
 		message.data = NULL;
-		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;
+		message.sz = (size_t)PTYPE_RESPONSE << MESSAGE_TYPE_SHIFT;	// 响应类型!!!
 
 		if (skynet_context_push(handle, &message)) {
 			return -1;

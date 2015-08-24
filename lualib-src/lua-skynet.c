@@ -35,7 +35,7 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 		lua_rawgetp(L, LUA_REGISTRYINDEX, _cb);
 		// 这时栈结构, _cb对应的值, 是个函数(-1), traceback 函数(-2)
 	} else {		// 每次运行的时候, 必须保证当前线程(Lua 的线程)只有上面初始化的值
-		assert(top == 2);
+		assert(top == 2);	// 保证 lua 栈上就 2 个元素, _cb 对应的函数对象(2), traceback 函数(1)
 	}
 	lua_pushvalue(L,2);
 
@@ -88,7 +88,9 @@ forward_cb(struct skynet_context * context, void * ud, int type, int session, ui
 static int
 _callback(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
+
 	int forward = lua_toboolean(L, 2);	// 是否 正向模式
+
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);	// 只保留第一个参数, 是个函数对象
 	lua_rawsetp(L, LUA_REGISTRYINDEX, _cb);	// 注册表添加 _cb 键关联栈顶的函数值

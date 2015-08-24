@@ -79,19 +79,32 @@ local session_coroutine_address = {}
 local session_response = {}
 local unresponse = {}
 
+-- 记录需要唤醒的 coroutine, 键是 coroutine, 值是 true
 local wakeup_session = {}
+
+-- 当前因 "SLEEP" 挂起的协程, 键是 session, 值是 coroutine
 local sleep_session = {}
 
+-- 监控的服务, 键是服务地址, 值是该服务的引用计数
 local watching_service = {}
+
+-- 监控的 session, 键是 session, 值是服务地址
 local watching_session = {}
+
+-- 
 local dead_service = {}
+
+-- 错误队列, 存放的是 session 的数组
 local error_queue = {}
+
+-- 通过 skynet.fork() 创建的 coroutine 的集合
 local fork_queue = {}
 
 -- suspend is function
+-- suspend 是函数
 local suspend
 
--- 将字符串格式成 0x123456 这种 16 进制的格式
+-- 将 :ff1234 形式的字符串转化成 0xff1234 这种格式的字符串, 然后再转化成整型返回.
 local function string_to_handle(str)
 	return tonumber("0x" .. string.sub(str , 2))
 end
@@ -99,6 +112,7 @@ end
 ----- monitor exit
 ----- 监视器退出
 
+-- 从错误队列派发错误
 local function dispatch_error_queue()
 	local session = table.remove(error_queue,1)
 	if session then
@@ -108,13 +122,17 @@ local function dispatch_error_queue()
 	end
 end
 
+-- 将 error_session 压入到 error_queue 中
 local function _error_dispatch(error_session, error_source)
 	if error_session == 0 then
 		-- service is down
-		--  Don't remove from watching_service , because user may call dead service
+		-- Don't remove from watching_service , because user may call dead service
+		-- 服务牺牲了
+		-- 不要从 watching_service 移除, 因为用户可能调用死掉的服务
 		if watching_service[error_source] then
 			dead_service[error_source] = true
 		end
+
 		for session, srv in pairs(watching_session) do
 			if srv == error_source then
 				table.insert(error_queue, session)
@@ -122,6 +140,7 @@ local function _error_dispatch(error_session, error_source)
 		end
 	else
 		-- capture an error for error_session
+		-- 捕获 1 个错误
 		if watching_session[error_session] then
 			table.insert(error_queue, error_session)
 		end
@@ -131,27 +150,29 @@ end
 -- coroutine reuse
 -- 协程复用
 
-local coroutine_pool = {}
+local coroutine_pool = {}	-- 协程池, 存放着当前可用的协程对象
 local coroutine_yield = coroutine.yield
 
+-- 获得 1 个协程对象
 local function co_create(f)
 	local co = table.remove(coroutine_pool)
 	if co == nil then
 		co = coroutine.create(function(...)
-			f(...)
+			f(...)	-- 执行协程的主函数逻辑
 			while true do
 				f = nil
-				coroutine_pool[#coroutine_pool+1] = co
-				f = coroutine_yield "EXIT"
-				f(coroutine_yield())
+				coroutine_pool[#coroutine_pool+1] = co	-- 记录此协程 co 可用
+				f = coroutine_yield "EXIT"	-- 让出, 通知此协程退出, 删除相关资源; 恢复执行的时候得到新的执行函数. #2
+				f(coroutine_yield())	-- 再次让出, 等待传来参数; 恢复的时候继续执行函数主体. #1
 			end
 		end)
 	else
-		coroutine.resume(co, f)
+		coroutine.resume(co, f)	-- 如果此 co 是从池中取出, 那么恢复此 co, 关联到上面的代码的 #2 位置
 	end
 	return co
 end
 
+-- 唤醒 sleep 的 coroutine
 local function dispatch_wakeup()
 	local co = next(wakeup_session)
 	if co then
@@ -164,6 +185,7 @@ local function dispatch_wakeup()
 	end
 end
 
+-- 释放监控服务的引用
 local function release_watching(address)
 	local ref = watching_service[address]
 	if ref then
@@ -178,6 +200,12 @@ end
 
 -- suspend is local function
 -- syspend 是一个私有函数
+--[====[
+result 如果为 false, 那么表示该 co 发生了错误;
+command 命令, 各个详细的命令在下面说明;
+param 其他参数;
+size 这个和 param 有关, 如果 param 是数据指针, 那么 size 表示指针所指数据的大小;
+--]====]
 function suspend(co, result, command, param, size)
 	-- 如果协程运行发生错误, 发送错误信息给消息源
 	if not result then
@@ -187,7 +215,7 @@ function suspend(co, result, command, param, size)
 			local addr = session_coroutine_address[co]
 			if session ~= 0 then
 				-- only call response error
-				-- 只调用相应错误信息
+				-- 告诉请求服务, 产生错误了
 				c.send(addr, skynet.PTYPE_ERROR, session, "")
 			end
 			session_coroutine_id[co] = nil
@@ -208,27 +236,30 @@ function suspend(co, result, command, param, size)
 			error(debug.traceback(co))
 		end
 
-		-- 标记已经响应了
 		session_response[co] = true
+
 		local ret
 		if not dead_service[co_address] then
 			ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, param, size) ~= nil
 			if not ret then
 				-- If the package is too large, returns nil. so we should report error back
-				-- 如果包太大, 返回 nil. 所以我们应该报告错误.
+				-- 如果数据包太大, 返回 nil. 所以我们应该回应错误.
 				c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 			end
 		elseif size ~= nil then
 			c.trash(param, size)
 			ret = false
 		end
+
 		return suspend(co, coroutine.resume(co, ret))
 	elseif command == "RESPONSE" then
 		local co_session = session_coroutine_id[co]
 		local co_address = session_coroutine_address[co]
+		
 		if session_response[co] then
 			error(debug.traceback(co))
 		end
+
 		local f = param
 		local function response(ok, ...)
 			if ok == "TEST" then
@@ -240,6 +271,7 @@ function suspend(co, result, command, param, size)
 					return true
 				end
 			end
+
 			if not f then
 				if f == false then
 					f = nil
@@ -254,6 +286,7 @@ function suspend(co, result, command, param, size)
 					ret = c.send(co_address, skynet.PTYPE_RESPONSE, co_session, f(...)) ~= nil
 					if not ret then
 						-- If the package is too large, returns false. so we should report error back
+						-- 如果包太大, 返回 nil. 所以我们应该回应错误.
 						c.send(co_address, skynet.PTYPE_ERROR, co_session, "")
 					end
 				else
@@ -262,11 +295,13 @@ function suspend(co, result, command, param, size)
 			else
 				ret = false
 			end
+
 			release_watching(co_address)
 			unresponse[response] = nil
 			f = nil
 			return ret
 		end
+
 		watching_service[co_address] = watching_service[co_address] + 1
 		session_response[co] = response
 		unresponse[response] = true
@@ -290,18 +325,25 @@ function suspend(co, result, command, param, size)
 	else
 		error("Unknown command : " .. command .. "\n" .. debug.traceback(co))
 	end
+
 	dispatch_wakeup()
 	dispatch_error_queue()
 end
 
+-- 让框架在 ti 个单位时间后，调用 func 这个函数。这不是一个阻塞 API ，当前 coroutine 会继续向下运行，而 func 将来会在新的 coroutine 中执行。
 function skynet.timeout(ti, func)
 	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)
 	local co = co_create(func)
 	assert(session_id_coroutine[session] == nil)
+
+	-- 记录当前 session 对应的 coroutine
 	session_id_coroutine[session] = co
 end
 
+-- 将当前 coroutine 挂起 ti 个单位时间。一个单位是 1/100 秒。
+-- 它是向框架注册一个定时器实现的。框架会在 ti 时间后，发送一个定时器消息来唤醒这个 coroutine 。
+-- 这是一个阻塞 API 。它的返回值会告诉你是时间到了，还是被 skynet.wakeup 唤醒 （返回 "BREAK"）。
 function skynet.sleep(ti)
 	local session = c.intcommand("TIMEOUT",ti)
 	assert(session)
@@ -310,6 +352,7 @@ function skynet.sleep(ti)
 	if succ then
 		return
 	end
+
 	if ret == "BREAK" then
 		return "BREAK"
 	else
@@ -317,18 +360,22 @@ function skynet.sleep(ti)
 	end
 end
 
+-- 相当于 skynet.sleep(0) 。交出当前服务对 CPU 的控制权。
+-- 通常在你想做大量的操作，又没有机会调用阻塞 API 时，可以选择调用 yield 让系统跑的更平滑。
 function skynet.yield()
 	return skynet.sleep(0)
 end
 
+-- 把当前 coroutine 挂起。通常这个函数需要结合 skynet.wakeup 使用。
 function skynet.wait()
-	local session = c.genid()
+	local session = c.genid()	-- 生成新的 session
 	local ret, msg = coroutine_yield("SLEEP", session)
 	local co = coroutine.running()
 	sleep_session[co] = nil
 	session_id_coroutine[session] = nil
 end
 
+-- 用于获得服务自己的地址。
 local self_handle
 function skynet.self()
 	if self_handle then
@@ -338,6 +385,7 @@ function skynet.self()
 	return self_handle
 end
 
+-- 用来查询一个 . 开头的名字对应的地址。它是一个非阻塞 API ，不可以查询跨节点的全局名字。
 function skynet.localname(name)
 	local addr = c.command("QUERY", name)
 	if addr then
@@ -345,44 +393,63 @@ function skynet.localname(name)
 	end
 end
 
+-- 将返回 skynet 节点进程启动的时间。这个返回值的数值本身意义不大，不同节点在同一时刻取到的值也不相同。
+-- 只有两次调用的差值才有意义。用来测量经过的时间。每 100 表示真实时间 1 秒。
+-- 这个函数的开销小于查询系统时钟。在同一个时间片内（没有因为阻塞 API 挂起），这个值是不变的。
 function skynet.now()
 	return c.intcommand("NOW")
 end
 
+-- 返回 skynet 节点进程启动的 UTC 时间，以秒为单位。
 function skynet.starttime()
 	return c.intcommand("STARTTIME")
 end
 
+-- 返回以秒为单位（精度为小数点后两位）的 UTC 时间。
 function skynet.time()
 	return skynet.now()/100 + skynet.starttime()	-- get now first would be better
 end
 
+-- 用于退出当前的服务。skynet.exit 之后的代码都不会被运行。而且，当前服务被阻塞住的 coroutine 也会立刻中断退出。
+-- 这些通常是一些 RPC 尚未收到回应。所以调用 skynet.exit() 请务必小心。
+-- 关闭了当前的服务, 所以对于之前请求的消息, 将以 PTYPE_ERROR 的类型返回给消息源.
 function skynet.exit()
-	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit
+	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit, 没有被 fork 的协程能够在 skynet.exit 后执行
 	skynet.send(".launcher","lua","REMOVE",skynet.self(), false)
+
 	-- report the sources that call me
+	-- 以 PTYPE_ERROR 类型给消息源发送消息.
 	for co, session in pairs(session_coroutine_id) do
 		local address = session_coroutine_address[co]
-		if session~=0 and address then
+		if session ~= 0 and address then
 			c.redirect(address, 0, skynet.PTYPE_ERROR, session, "")
 		end
 	end
+
 	for resp in pairs(unresponse) do
 		resp(false)
 	end
+
 	-- report the sources I call but haven't return
+	-- 给 watching_session 里面消息的消息源发送 PTYPE_ERROR 类型消息
 	local tmp = {}
 	for session, address in pairs(watching_session) do
 		tmp[address] = true
 	end
+
 	for address in pairs(tmp) do
 		c.redirect(address, 0, skynet.PTYPE_ERROR, 0, "")
 	end
+
+	-- 释放掉 skynet_context 的资源
 	c.command("EXIT")
+
 	-- quit service
+	-- 退出服务
 	coroutine_yield "QUIT"
 end
 
+-- 得到当前节点的一些全局配置, 服务间通用
 function skynet.getenv(key)
 	local ret = c.command("GETENV",key)
 	if ret == "" then
@@ -392,17 +459,23 @@ function skynet.getenv(key)
 	end
 end
 
+-- 设置当前节点的一些全局配置, 服务间通用
 function skynet.setenv(key, value)
 	c.command("SETENV",key .. " " ..value)
 end
 
+-- 这条 API 可以把一条类别为 typename 的消息发送给 address 。它会先经过事先注册的 pack 函数打包 ... 的内容。
+-- 是一条非阻塞 API ，发送完消息后，coroutine 会继续向下运行，这期间服务不会重入。
 function skynet.send(addr, typename, ...)
 	local p = proto[typename]
-	return c.send(addr, p.id, 0 , p.pack(...))
+	return c.send(addr, p.id, 0, p.pack(...))
 end
 
+-- 生成一个唯一 session 号。
 skynet.genid = assert(c.genid)
 
+-- 它和 skynet.send 功能类似，但更细节一些。它可以指定发送地址（把消息源伪装成另一个服务），
+-- 指定发送的消息的 session 。注：address 和 source 都必须是数字地址，不可以是别名。
 skynet.redirect = function(dest,source,typename,...)
 	return c.redirect(dest, source, proto[typename].id, ...)
 end
@@ -413,9 +486,10 @@ skynet.unpack = assert(c.unpack)
 skynet.tostring = assert(c.tostring)
 skynet.trash = assert(c.trash)
 
+-- 挂起当前的协程, 记录 session
 local function yield_call(service, session)
 	watching_session[session] = service
-	local succ, msg, sz = coroutine_yield("CALL", session)
+	local succ, msg, sz = coroutine_yield("CALL", session)		-- session_id_coroutine[param] = co, session -> coroutine
 	watching_session[session] = nil
 	if not succ then
 		error "call failed"
@@ -423,6 +497,8 @@ local function yield_call(service, session)
 	return msg,sz
 end
 
+-- 这条 API 则不同，它会在内部生成一个唯一 session ，并向 address 提起请求，并阻塞等待对 session 的回应（可以不由 address 回应）。
+-- 当消息回应后，还会通过之前注册的 unpack 函数解包。表面上看起来，就是发起了一次 RPC ，并阻塞等待回应。
 function skynet.call(addr, typename, ...)
 	local p = proto[typename]
 	local session = c.send(addr, p.id , nil , p.pack(...))
@@ -432,33 +508,42 @@ function skynet.call(addr, typename, ...)
 	return p.unpack(yield_call(addr, session))
 end
 
+-- 它和 skynet.call 功能类似（也是阻塞 API）。但发送时不经过 pack 打包流程，收到回应后，也不走 unpack 流程。
 function skynet.rawcall(addr, typename, msg, sz)
 	local p = proto[typename]
 	local session = assert(c.send(addr, p.id , nil , msg, sz), "call to invalid address")
 	return yield_call(addr, session)
 end
 
+-- 它会将 message size 对应的消息附上当前消息的 session ，以及 skynet.PTYPE_RESPONSE 这个类别，发送给当前消息的来源 source 。
 function skynet.ret(msg, sz)
 	msg = msg or ""
 	return coroutine_yield("RETURN", msg, sz)
 end
 
+-- 返回的闭包可用于延迟回应。调用它(返回的函数)时，第一个参数通常是 true 表示是一个正常的回应，之后的参数是需要回应的数据。
+-- 如果是 false ，则给请求者抛出一个异常。它的返回值表示回应的地址是否还有效。
+-- 如果你仅仅想知道回应地址的有效性，那么可以在第一个参数传入 "TEST" 用于检测。
 function skynet.response(pack)
 	pack = pack or skynet.pack
 	return coroutine_yield("RESPONSE", pack)
 end
 
+-- 与 skynet.ret 功能相同, 区别的地方在于, 此函数对传入的参数调用 skynet.pack 方法
 function skynet.retpack(...)
 	return skynet.ret(skynet.pack(...))
 end
 
+-- 唤醒一个被 skynet.sleep 或 skynet.wait 挂起的 coroutine
 function skynet.wakeup(co)
+	-- 实现细节参考 dispatch_wakeup, 这里只是做 1 个标记
 	if sleep_session[co] and wakeup_session[co] == nil then
 		wakeup_session[co] = true
 		return true
 	end
 end
 
+-- 注册特定类消息的处理函数。
 function skynet.dispatch(typename, func)
 	local p = proto[typename]
 	if func then
@@ -470,22 +555,26 @@ function skynet.dispatch(typename, func)
 	end
 end
 
+-- 打印未知的请求错误, 并抛出错误
 local function unknown_request(session, address, msg, sz, prototype)
 	skynet.error(string.format("Unknown request (%s): %s", prototype, c.tostring(msg,sz)))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
+-- 设置新的 unknown_request, 返回设置前的 dispatch_unknown_request
 function skynet.dispatch_unknown_request(unknown)
 	local prev = unknown_request
 	unknown_request = unknown
 	return prev
 end
 
+-- 打印未知的响应错误, 并抛出错误
 local function unknown_response(session, address, msg, sz)
 	skynet.error(string.format("Response message : %s" , c.tostring(msg,sz)))
 	error(string.format("Unknown session : %d from %x", session, address))
 end
 
+-- 设置新的 unknown_response, 返回设置前的 unknown_response
 function skynet.dispatch_unknown_response(unknown)
 	local prev = unknown_response
 	unknown_response = unknown
@@ -494,6 +583,7 @@ end
 
 local tunpack = table.unpack
 
+-- 从功能上，它等价于 skynet.timeout(0, function() func(...) end) 但是比 timeout 高效一点。因为它并不需要向框架注册一个定时器。
 function skynet.fork(func,...)
 	local args = { ... }
 	local co = co_create(function()
@@ -503,9 +593,10 @@ function skynet.fork(func,...)
 	return co
 end
 
+-- 
 local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 	-- skynet.PTYPE_RESPONSE = 1, read skynet.h
-	if prototype == 1 then
+	if prototype == 1 then	-- 处理响应类型的消息
 		local co = session_id_coroutine[session]
 		if co == "BREAK" then
 			session_id_coroutine[session] = nil
@@ -517,14 +608,17 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 		end
 	else
 		local p = proto[prototype]
+
+		-- 确认注册了该类型
 		if p == nil then
-			if session ~= 0 then
+			if session ~= 0 then	-- 如果需要回应, 则告诉请求服务发生错误
 				c.send(source, skynet.PTYPE_ERROR, session, "")
-			else
+			else	-- 报告未知的请求类型
 				unknown_request(session, source, msg, sz, prototype)
 			end
 			return
 		end
+
 		local f = p.dispatch
 		if f then
 			local ref = watching_service[source]
@@ -533,10 +627,11 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 			else
 				watching_service[source] = 1
 			end
+
 			local co = co_create(f)
 			session_coroutine_id[co] = session
 			session_coroutine_address[co] = source
-			suspend(co, coroutine.resume(co, session,source, p.unpack(msg,sz, ...)))
+			suspend(co, coroutine.resume(co, session, source, p.unpack(msg, sz, ...)))
 		else
 			unknown_request(session, source, msg, sz, proto[prototype].name)
 		end
@@ -550,6 +645,7 @@ function skynet.dispatch_message(...)
 		if co == nil then
 			break
 		end
+
 		fork_queue[key] = nil
 		local fork_succ, fork_err = pcall(suspend,co,coroutine.resume(co))
 		if not fork_succ then
@@ -564,6 +660,10 @@ function skynet.dispatch_message(...)
 	assert(succ, tostring(err))
 end
 
+-- 用于启动一个新的 Lua 服务。name 是脚本的名字（不用写 .lua 后缀）。
+-- 只有被启动的脚本的 start 函数返回后，这个 API 才会返回启动的服务的地址，这是一个阻塞 API 。
+-- 如果被启动的脚本在初始化环节抛出异常，或在初始化完成前就调用 skynet.exit 退出，｀skynet.newservice` 都会抛出异常。
+-- 如果被启动的脚本的 start 函数是一个永不结束的循环，那么 newservice 也会被永远阻塞住。
 function skynet.newservice(name, ...)
 	return skynet.call(".launcher", "lua" , "LAUNCH", "snlua", name, ...)
 end

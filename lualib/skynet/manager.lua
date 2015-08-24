@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local c = require "skynet.core"
 
+-- 启动 1 个服务, 第一个参数必须是 C 模块名, 剩下的可以是传给该模块的参数
 function skynet.launch(...)
 	local addr = c.command("LAUNCH", table.concat({...}," "))
 	if addr then
@@ -8,6 +9,9 @@ function skynet.launch(...)
 	end
 end
 
+-- 可以用来强制关闭别的服务。但强烈不推荐这样做。因为对象会在任意一条消息处理完毕后，毫无征兆的退出。
+-- 所以推荐的做法是，发送一条消息，让对方自己善后以及调用 skynet.exit 。
+-- 注：skynet.kill(skynet.self()) 不完全等价于 skynet.exit() ，后者更安全。
 function skynet.kill(name)
 	if type(name) == "number" then
 		skynet.send(".launcher","lua","REMOVE",name, true)
@@ -51,6 +55,7 @@ end
 
 local dispatch_message = skynet.dispatch_message
 
+-- 将本服务实现为消息转发器，对一类消息进行转发。
 function skynet.forward_type(map, start_func)
 	c.callback(function(ptype, msg, sz, ...)
 		local prototype = map[ptype]
