@@ -44,7 +44,7 @@ skynet_handle_register(struct skynet_context *ctx) {
 
 		// 从头开始循环遍历
 		for (i=0;i<s->slot_size;i++) {
-			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;	// 获得从右到左 3 个字节的数据, 最左的 4 个字节用来表示 harbor
+			uint32_t handle = (i+s->handle_index) & HANDLE_MASK;	// 获得从右到左 3 个字节的数据, 最左的低 4 个字节(高 8 位)用来表示 harbor
 			int hash = handle & (s->slot_size-1);					// 获得实际的索引, hash 的值不超出 slot_size 的范围
 
 			// 当有可用的 slot 放入 ctx

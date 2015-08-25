@@ -170,7 +170,7 @@ skynet_context_new(const char * name, const char * param) {
 	// Should set to 0 first to avoid skynet_handle_retireall get an uninitialized handle
 	// 首先应该设置 handle 为 0, 避免 skynet_handle_retireall 方法得到一个未初始化的 handle
 	ctx->handle = 0;
-	ctx->handle = skynet_handle_register(ctx);
+	ctx->handle = skynet_handle_register(ctx);	// 当 ctx->handle 被赋值的时候, 才能保证 handle 的管理器 和 context 同步了.
 
 	struct message_queue * queue = ctx->queue = skynet_mq_create(ctx->handle);
 
@@ -753,7 +753,7 @@ cmd_monitor(struct skynet_context * context, const char * param) {
 	if (param == NULL || param[0] == '\0') {
 		if (G_NODE.monitor_exit) {
 			// return current monitor serivce
-			// 返回当前的监控服务
+			// 返回当前的监控服务的 handle
 			sprintf(context->result, ":%x", G_NODE.monitor_exit);
 			return context->result;
 		}

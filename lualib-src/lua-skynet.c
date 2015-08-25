@@ -72,24 +72,24 @@ _cb(struct skynet_context * context, void * ud, int type, int session, uint32_t 
 	return 0;
 }
 
-/// 正向模式回调, 返回 1, 不删除 msg
+/// 消息转发模式回调, 返回 1, 不删除 msg
 static int
 forward_cb(struct skynet_context * context, void * ud, int type, int session, uint32_t source, const void * msg, size_t sz) {
 	_cb(context, ud, type, session, source, msg, sz);
 	// don't delete msg in forward mode.
-	// 在正向模式中不要删除 msg. 可以参考 skynet_server.c 的 dispatch_message 方法, 返回 1 表示不删除 msg, 返回 0 需要删除 msg.
+	// 在消息转发模式中不要删除 msg. 可以参考 skynet_server.c 的 dispatch_message 方法, 返回 1 表示不删除 msg, 返回 0 需要删除 msg.
 	return 1;
 }
 
 /**
  * 设置 skynet_context 的回调函数
- * lua: 接收 2 个参数, 参数 1, 回调的执行函数; 参数 2, 是否正向模式, 
+ * lua: 接收 2 个参数, 参数 1, 回调的执行函数; 参数 2, 是否消息转发模式, 
  */
 static int
 _callback(lua_State *L) {
 	struct skynet_context * context = lua_touserdata(L, lua_upvalueindex(1));
 
-	int forward = lua_toboolean(L, 2);	// 是否 正向模式
+	int forward = lua_toboolean(L, 2);	// 是否消息转发模式
 
 	luaL_checktype(L,1,LUA_TFUNCTION);
 	lua_settop(L,1);	// 只保留第一个参数, 是个函数对象

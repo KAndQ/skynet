@@ -20,10 +20,13 @@ function skynet.kill(name)
 	c.command("KILL",name)
 end
 
+-- 退出 skynet 进程
 function skynet.abort()
 	c.command("ABORT")
 end
 
+-- 给 handle 注册 name 名字, 该名字用于全 skynet 网络
+-- 能够注册整个 skynet 网络名字返回 true, 并且注册成功; 否则返回 false;
 local function globalname(name, handle)
 	local c = string.sub(name,1,1)
 	assert(c ~= ':')
@@ -41,12 +44,14 @@ local function globalname(name, handle)
 	return true
 end
 
+-- 给自身注册一个名字
 function skynet.register(name)
 	if not globalname(name) then
 		c.command("REG", name)
 	end
 end
 
+-- 为一个服务命名。
 function skynet.name(name, handle)
 	if not globalname(name, handle) then
 		c.command("NAME", name .. " " .. skynet.address(handle))
@@ -66,20 +71,24 @@ function skynet.forward_type(map, start_func)
 			c.trash(msg, sz)
 		end
 	end, true)
+
 	skynet.timeout(0, function()
 		skynet.init_service(start_func)
 	end)
 end
 
+-- 过滤消息再处理。
 function skynet.filter(f ,start_func)
 	c.callback(function(...)
 		dispatch_message(f(...))
 	end)
+	
 	skynet.timeout(0, function()
 		skynet.init_service(start_func)
 	end)
 end
 
+-- 给当前 skynet 进程设置一个全局的服务监控。
 function skynet.monitor(service, query)
 	local monitor
 	if query then
