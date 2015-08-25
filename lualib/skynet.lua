@@ -693,8 +693,9 @@ local function raw_dispatch_message(prototype, msg, sz, session, source, ...)
 		else
 			session_id_coroutine[session] = nil
 
-			-- 开始或者继续协程的执行, 之前挂起的协程(请求), 既然这里处理的是响应信息, 那么就可以理解为, 之前此服务的请求挂起了. 
+			-- 开始或者继续挂起的协程(请求), 既然这里处理的是响应信息, 那么就可以理解为, 之前此服务的请求挂起了. 
 			-- 使用计时器来举例: 这时才会运行之前注册的计时器处理函数, 这也就是为什么 "而 func 将来会在新的 coroutine 中执行" 的意思.
+			-- 其实对于每个接收到的消息, 都会创建 1 个 coroutine 来处理.
 			suspend(co, coroutine.resume(co, true, msg, sz))
 		end
 	else	-- 从其他的服务那里接收到非响应类型的消息
