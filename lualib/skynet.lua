@@ -99,9 +99,12 @@ local sleep_session = {}
 local watching_service = {}
 
 -- 监控的 session, 键是 session, 值是服务地址(整型)
+-- 存储的 session 是需要回应的 session, 地址就是请求的服务器地址.
 local watching_session = {}
 
 -- 已经无效的服务集合, 键是服务的地址(整型), 值是布尔类型 true
+-- 如果 [其他服务] 给 [当前服务] 发来 PTYPE_ERROR 类型消息, 并且 [其他服务] 在 watching_service 里面(正在监控), 
+-- 那么则将 [其他服务] 加入到 dead_service 里面, [当前服务] 认为这个 [其他服务] 是 dead.
 local dead_service = {}
 
 -- 错误队列, 存放的是 session 的数组, 产生错误的 session 都放在此数组里面
@@ -122,7 +125,7 @@ end
 ----- monitor exit
 ----- 监视器退出
 
--- 从错误队列弹出发生错误的 session, 然后查询到对应的 coroutine, 恢复 coroutine.
+-- 恢复正在等待回应的协程, 之前的请求回应错误.
 -- 注意, 在 suspend 函数里面有调用 dispatch_error_queue 函数, 所以可以将所有的错误 session 进行处理.
 local function dispatch_error_queue()
 	local session = table.remove(error_queue, 1)
@@ -496,11 +499,13 @@ end
 -- 这些通常是一些 RPC 尚未收到回应。所以调用 skynet.exit() 请务必小心。
 -- 关闭了当前的服务, 所以对于之前请求的消息, 将以 PTYPE_ERROR 的类型返回给消息源.
 function skynet.exit()
-	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit, 没有被 fork 的协程能够在 skynet.exit 后执行
-	skynet.send(".launcher","lua","REMOVE",skynet.self(), false)
+	fork_queue = {}	-- no fork coroutine can be execute after skynet.exit, 在 skynet.exit 之后不再执行协程
+
+	-- 给 launcher 服务发送 "REMOVE" 命令
+	skynet.send(".launcher", "lua", "REMOVE", skynet.self(), false)
 
 	-- report the sources that call me
-	-- 以 PTYPE_ERROR 类型给消息源发送消息.
+	-- 给需要回应服务发送 PTYPE_ERROR 类型的消息
 	for co, session in pairs(session_coroutine_id) do
 		local address = session_coroutine_address[co]
 		if session ~= 0 and address then
@@ -508,12 +513,14 @@ function skynet.exit()
 		end
 	end
 
+	-- 对创建了 response 但还未 response 的服务返回 PTYPE_ERROR 消息
 	for resp in pairs(unresponse) do
 		resp(false)
 	end
 
 	-- report the sources I call but haven't return
 	-- 给 watching_session 里面消息的消息源发送 PTYPE_ERROR 类型消息
+	-- 因为 watching_session 里面存储的是正在等待的回应, 这里是报告请求服务, "我出错了, 你不用再理会我了."
 	local tmp = {}
 	for session, address in pairs(watching_session) do
 		tmp[address] = true

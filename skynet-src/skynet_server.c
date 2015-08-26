@@ -185,6 +185,7 @@ skynet_context_new(const char * name, const char * param) {
 
 	// inst 初始化成功
 	if (r == 0) {
+		// ctx 引用 -1
 		struct skynet_context * ret = skynet_context_release(ctx);
 
 		// 标记初始化成功
