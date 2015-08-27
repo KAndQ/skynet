@@ -61,7 +61,7 @@ static void sp_del(poll_fd fd, int sock);
 static void sp_write(poll_fd, int sock, void *ud, bool enable);
 
 /**
- * 等待当前产生的事件, 并将产生的事件记录下来传递给 struct event
+ * 等待当前产生的事件, 并将产生的事件记录下来传递给 struct event, 当没有 event 可以返回的时候, 此函数会发生阻塞.
  * @param poll_fd 之前创建的 event pool 句柄
  * @param e 记录事件的 struct event
  * @param max 能够处理事件的最大数量

@@ -33,7 +33,8 @@ skynet_socket_free() {
 // 主循环线程
 
 /**
- * 将 result 内容转化为 skynet_message 压入到 result->opaque 中
+ * 将 socket_message 内容转化为 skynet_socket_message, 再使用 skynet_message 保存 skynet_socket_message 的引用, 
+ * 最后把 skynet_message 存入到 skynet_context 的队列中.
  * @param type 当前处理的 SOCKET 操作类型
  * @param padding true 表示 result->data 是字符串类型, 需要在 struct skynet_socket_message 之后填充内容; false 不需要填充
  * @param result 之前 socket_server 处理得到的结果
@@ -138,7 +139,7 @@ check_wsz(struct skynet_context *ctx, int id, void *buffer, int64_t wsz) {
 		tmp.id = id;
 		tmp.ud = (int)(wsz / 1024);
 		tmp.buffer = NULL;
-		skynet_send(ctx, 0, skynet_context_handle(ctx), PTYPE_SOCKET, 0 , &tmp, sizeof(tmp));
+		skynet_send(ctx, 0, skynet_context_handle(ctx), PTYPE_SOCKET, 0 , &tmp, sizeof(tmp));	// 注意, 这里会复制 skynet_socket_message 的数据
 //		skynet_error(ctx, "%d Mb bytes on socket %d need to send out", (int)(wsz / (1024 * 1024)), id);
 	}
 	return 0;

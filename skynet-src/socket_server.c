@@ -384,6 +384,7 @@ socket_server_create() {
 	}
 
 	// 将读的文件描述符添加到 event pool 中
+	// 添加到 event pool 中之后, 只要该文件操作可读, 那么当前线程也不会阻塞
 	if (sp_add(efd, fd[0], NULL)) {
 		// add recvctrl_fd to event poll
 		fprintf(stderr, "socket-server: can't add server fd to event pool.\n");
@@ -1108,7 +1109,7 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 		return SOCKET_CLOSE;
 	}
 
-	// 如果还有链表不为空, 那么将 socket 标记为半关闭状态
+	// 如果还有链表不为空, 那么将 socket 标记为半关闭状态, 直到写链表里面的数据全部发送完之后, 才会真正的关闭该 socket
 	s->type = SOCKET_TYPE_HALFCLOSE;
 
 	return -1;
@@ -1155,11 +1156,11 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 			return SOCKET_ERROR;
 		}
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
-		s->opaque = request->opaque;
+		s->opaque = request->opaque;	// 这里很重要, 在 skynet 中是关联到所在的 skynet_context 的 handle
 		result->data = "start";
 		return SOCKET_OPEN;
 	} else if (s->type == SOCKET_TYPE_CONNECTED) {
-		s->opaque = request->opaque;
+		s->opaque = request->opaque;	// 这里很重要, 在 skynet 中是关联到所在的 skynet_context 的 handle
 		result->data = "transfer";
 		return SOCKET_OPEN;
 	}
@@ -1178,7 +1179,7 @@ setopt_socket(struct socket_server *ss, struct request_setopt *request) {
 	setsockopt(s->fd, IPPROTO_TCP, request->what, &v, sizeof(v));
 }
 
-/// 以阻塞的方式, 从管道读出数据, 就是这里会让整个通信线程阻塞
+/// 以阻塞的方式, 从管道读出数据
 static void
 block_readpipe(int pipefd, void *buffer, int sz) {
 	for (;;) {
@@ -1348,12 +1349,14 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_me
 
 	// socket 读取数据
 	int sz = s->p.size;
-	char * buffer = MALLOC(sz);
+	char * buffer = MALLOC(sz);		// 在这里分配读取数据的内存
 	int n = (int)read(s->fd, buffer, sz);
 
 	// 错误处理
 	if (n < 0) {
+		// 释放分配的内存资源
 		FREE(buffer);
+
 		switch(errno) {
 		case EINTR:
 			break;
@@ -1366,6 +1369,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_me
 			force_close(ss, s, result);
 			return SOCKET_ERROR;
 		}
+
 		return -1;
 	}
 

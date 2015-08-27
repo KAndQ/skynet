@@ -120,11 +120,6 @@ sp_wait(int efd, struct event *e, int max) {
 	// maxevents告之内核这个events有多大，这个maxevents的值不能大于创建epoll_create()时的size
 	// 参数timeout是超时时间（毫秒，0会立即返回，-1将不确定，也有说法说是永久阻塞）
 	// 该函数返回需要处理的事件数目，如返回0表示已超时。
-	// 
-	// 工作原理: 等侍注册在epfd上的socket fd的事件的发生，如果发生则将发生的sokct fd和事件类型放入到events数组中。
-	// 并且将注册在epfd上的socket fd的事件类型给清空，所以如果下一个循环你还要关注这个socket fd的话，
-	// 则需要用epoll_ctl(epfd,EPOLL_CTL_MOD,listenfd,&ev)来重新设置socket fd的事件类型。
-	// 这时不用EPOLL_CTL_ADD,因为socket fd并未清空，只是事件类型清空。这一步非常重要。
 	int n = epoll_wait(efd, ev, max, -1);
 	
 	// 记录当前产生的事件, 将结果传给 struct event

@@ -19,7 +19,8 @@
 #define LARGE_PAGE_NODE 12		// 决定分配缓存数据块的最大数量, 2 的次方
 #define BUFFER_LIMIT (256 * 1024)	// 暂时没有使用
 
-/// 缓存节点
+// 缓存节点, buffer_node 是不会被删除掉的, 除非所在的 lua 虚拟机 close 了, 这时 buffer_node 的内存资源才会被回收.
+// 在使用过程中, 都是对 msg 指向的内容做操作.
 struct buffer_node {
 	char * msg;	// 数据指针
 	int sz;	// 数据大小
@@ -79,6 +80,7 @@ lnewpool(lua_State *L, int sz) {
 
 	// luaL_newmetatable 这时栈顶是一个 table 类型
 	if (luaL_newmetatable(L, "buffer_pool")) {
+		// 第一次创建, 设置 gc 函数
 		// 给栈顶的表的 __gc 字段关联 lfreepool 函数, 给分配的 userdata 添加终结器, 执行释放内存前的一些操作.
 		lua_pushcfunction(L, lfreepool);
 		lua_setfield(L, -2, "__gc");
@@ -537,7 +539,7 @@ lreadline(lua_State *L) {
 	// 只检查
 	bool check = !lua_istable(L, 2);
 
-	// 获得第三个参数
+	// 获得第三个参数, 分割字符串
 	size_t seplen = 0;
 	const char *sep = luaL_checklstring(L,3,&seplen);
 

@@ -90,7 +90,7 @@ wakeup(struct monitor *m, int busy) {
 	}
 }
 
-/// 通信处理函数, 用于通信线程, 只有 1 个, 除非是管道没有数据可读, 否则通信线程是满负荷工作, 关于管道的读取可以查看 socket_server.c 的 block_readpipe 函数.
+/// 通信处理函数, 用于通信线程, 只有 1 个.
 static void *
 thread_socket(void *p) {
 	struct monitor * m = p;
