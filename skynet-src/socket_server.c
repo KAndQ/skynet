@@ -258,7 +258,7 @@ struct send_object {
 	void * buffer;	// 数据的指针
 	int sz;			// 数据的大小
 
-	// 释放资源的函数接口声明
+	// 释放资源的函数接口声明, 释放的是 buffer
 	void (*free_func)(void *);
 };
 
@@ -293,7 +293,7 @@ send_object_init(struct socket_server *ss, struct send_object *so, void *object,
 	}
 }
 
-/// 释放 write_buffer 内存资源, 会根据 wb->userobject 的值选择不同的释放方式.
+/// 释放 1 个 write_buffer 内存资源, 会根据 wb->userobject 的值选择不同的释放方式.
 static inline void
 write_buffer_free(struct socket_server *ss, struct write_buffer *wb) {
 	if (wb->userobject) {

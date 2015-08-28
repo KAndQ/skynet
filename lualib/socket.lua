@@ -4,7 +4,7 @@ local skynet_core = require "skynet.core"
 local assert = assert
 
 local socket = {}	-- api
-local buffer_pool = {}	-- store all message buffer object, 存储全部消息缓存对象, 这就是 lua-socket.c 里面介绍的 pool
+local buffer_pool = {}	-- store all message buffer object, 存储全部消息缓存对象, 这就是 lua-socket.c 里面介绍的 pool, 这个对象只有在当前 lua 沙箱被 close 的时候, 里面的数据(buffer_node)才会被删除.
 local socket_pool = setmetatable( -- store all socket object, 存储着所有的 socket 对象, 键是 socket 的 id.
 	{},
 	{ __gc = function(p)		-- socket_pool 在进行垃圾回收的时候会调用该方法
@@ -214,7 +214,7 @@ local function connect(id, func)
 
 	local s = {
 		id = id,	-- socket id
-		buffer = newbuffer,	-- socket_buffer
+		buffer = newbuffer,	-- socket_buffer, 作为 listener 的 socket, newbuffer 为 nil.
 		connected = false,	-- 是否连接
 
 		-- 有多个含义: 
@@ -546,7 +546,7 @@ end
 function socket.abandon(id)
 	local s = socket_pool[id]
 	if s and s.buffer then
-		driver.clear(s.buffer,buffer_pool)
+		driver.clear(s.buffer,buffer_pool)	-- 删除 socket_buffer 里面的数据
 	end
 	socket_pool[id] = nil
 end
