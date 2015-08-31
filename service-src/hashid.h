@@ -15,6 +15,8 @@ struct hashid_node {
 hash 表
 hash.id 是保证是要还有可用的 hash_node
 hash.hash 是管理当插入的 id 或者运算后的模值相同时的 hash_node
+
+hashid 的作用是传入一个 id 值, 然后得到这个 id 值在当前 hash 表的 hash 键值
 */
 struct hashid {
 	int hashmod;	// 模, 也是 hash.hash 的最大容量
@@ -40,7 +42,7 @@ hashid_init(struct hashid *hi, int max) {
 	while (hashcap < max) {
 		hashcap *= 2;
 	}
-	hi->hashmod = hashcap - 1;	// 这个是希望表示 hashcap 有几率可能与 max 相同?
+	hi->hashmod = hashcap - 1;	// 用于使用 & 运算, 因为以 2 个整数倍扩大, 减 1 后每个二进制位一定是 1
 
 	hi->cap = max;
 	hi->count = 0;
@@ -69,7 +71,7 @@ hashid_clear(struct hashid *hi) {
 	hi->count = 0;
 }
 
-/// 查询 hash_node, 返回 hash_node 与 hash.id 的指针偏移量; 如果没有查询到则返回 -1.
+/// 查询 hash_node, 返回 hash_node 与 hash.id 的指针偏移量(hash 键值); 如果没有查询到则返回 -1.
 static int
 hashid_lookup(struct hashid *hi, int id) {
 	int h = id & hi->hashmod;
@@ -83,7 +85,7 @@ hashid_lookup(struct hashid *hi, int id) {
 }
 
 /// 移除 id 对应的 hash_node. 只要找到 hash_node.id == id 的就移除返回(仅移除 1 个 hash_node).
-/// 返回值是 hash_node 在 hash.id 中的指针偏移量.
+/// 返回值是 hash_node 在 hash.id 中的指针偏移量(hash 键值).
 static int
 hashid_remove(struct hashid *hi, int id) {
 	int h = id & hi->hashmod;
@@ -116,7 +118,7 @@ _clear:
 	return c - hi->id;
 }
 
-/// 将 id 插入到 hash 表中, 返回插入的 hash_node 与 hash->id 的指针偏移量.
+/// 将 id 插入到 hash 表中, 返回插入的 hash_node 与 hash->id 的指针偏移量(hash 键值).
 static int
 hashid_insert(struct hashid * hi, int id) {
 	struct hashid_node *c = NULL;
