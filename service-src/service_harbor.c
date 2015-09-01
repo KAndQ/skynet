@@ -5,12 +5,21 @@
 
 /*
 	harbor listen the PTYPE_HARBOR (in text)
+	harbor 以文本的形式侦听 PTYPE_HARBOR 类型的消息
+
 	N name : update the global name
 	S fd id: connect to new harbor , we should send self_id to fd first , and then recv a id (check it), and at last send queue.
 	A fd id: accept new harbor , we should send self_id to fd , and then send queue.
 
+	N name : 更新全局名字
+	S fd id: 连接到新的 harbor, 我们首先应该发送自己的 id 到 fd, 然后接收 1 个 id(检查它), 然后在最后发送队列.
+	A fd id: 接收新的 harbor, 我们应该发送自己的 id 到 fd, 然后发送队列.
+
 	If the fd is disconnected, send message to slave in PTYPE_TEXT.  D id
 	If we don't known a globalname, send message to slave in PTYPE_TEXT. Q name
+
+	如果 fd 断开连接, 以 PTYPE_TEXT 消息类型发送消息到 slave. D id
+	如果我们不知道 1 个全局名字, 以 PTYPE_TEXT 消息类型发送消息给 slave. Q name
  */
 
 #include <stdio.h>
@@ -25,41 +34,51 @@
 #define DEFAULT_QUEUE_SIZE 1024
 
 // 12 is sizeof(struct remote_message_header)
+// 12 是 sizeof(struct remote_message_header)
 #define HEADER_COOKIE_LENGTH 12
 
 /*
 	message type (8bits) is in destination high 8bits
 	harbor id (8bits) is also in that place , but remote message doesn't need harbor id.
+
+	消息类型(8 位)在 destination 的高 8 位保存,
+	harbor id 也是在那个地方, 但是远程消息不需要 harbor id.
+
+	远程消息的消息头
  */
 struct remote_message_header {
-	uint32_t source;
-	uint32_t destination;
-	uint32_t session;
+	uint32_t source;		// 消息源
+	uint32_t destination;	// 目标源, 高 8 位存储消息类型
+	uint32_t session;		// session
 };
 
+// harbor 消息
 struct harbor_msg {
-	struct remote_message_header header;
-	void * buffer;
-	size_t size;
+	struct remote_message_header header;	// 消息头
+	void * buffer;	// 数据内容
+	size_t size;	// 数据大小
 };
 
+// 管理 harbor_msg 的队列
 struct harbor_msg_queue {
-	int size;
-	int head;
-	int tail;
-	struct harbor_msg * data;
+	int size;	// 队列的容量大小
+	int head;	// 队列头
+	int tail;	// 队列尾
+	struct harbor_msg * data;	// harbor_msg 数据指针
 };
 
+/// hashmap 中的数据元素
 struct keyvalue {
-	struct keyvalue * next;
-	char key[GLOBALNAME_LENGTH];
-	uint32_t hash;
+	struct keyvalue * next;				// 关联的下一个 keyvalue 节点, 栈结构, 最新插入的在头
+	char key[GLOBALNAME_LENGTH];		// 存储的字符串
+	uint32_t hash;						// 计算出来的 hash 值
 	uint32_t value;
 	struct harbor_msg_queue * queue;
 };
 
+/// 以 hash 表的数据结构存储 keyvalue
 struct hashmap {
-	struct keyvalue *node[HASH_SIZE];
+	struct keyvalue *node[HASH_SIZE];	// keyvalue 的集合
 };
 
 #define STATUS_WAIT 0
@@ -79,36 +98,49 @@ struct slave {
 };
 
 struct harbor {
-	struct skynet_context *ctx;
+	struct skynet_context *ctx;		// skynet_context
 	int id;
-	uint32_t slave;
+	uint32_t slave;					// skynet_context handle
 	struct hashmap * map;
 	struct slave s[REMOTE_MAX];
 };
 
 // hash table
+// hash 表
 
+/// 向 harbor_msg_queue 里面压入 harbor_msg
 static void
 push_queue_msg(struct harbor_msg_queue * queue, struct harbor_msg * m) {
 	// If there is only 1 free slot which is reserved to distinguish full/empty
 	// of circular buffer, expand it.
+	// 如果当只剩下 1 个空的缓存槽的时候, 扩展它.
 	if (((queue->tail + 1) % queue->size) == queue->head) {
+		// 分配新的内存
 		struct harbor_msg * new_buffer = skynet_malloc(queue->size * 2 * sizeof(struct harbor_msg));
+
+		// 将原来的数据复制给新分配的内存空间
 		int i;
 		for (i=0;i<queue->size-1;i++) {
 			new_buffer[i] = queue->data[(i+queue->head) % queue->size];
 		}
+
+		// 释放原来的内存
 		skynet_free(queue->data);
+
+		// 记录新的队列数据
 		queue->data = new_buffer;
 		queue->head = 0;
 		queue->tail = queue->size - 1;
 		queue->size *= 2;
 	}
+
+	// 将 harbor_msg 压入到队列
 	struct harbor_msg * slot = &queue->data[queue->tail];
 	*slot = *m;
 	queue->tail = (queue->tail + 1) % queue->size;
 }
 
+/// 将数据转换成 harbor_msg 压入到 harbor_msg_queue 中
 static void
 push_queue(struct harbor_msg_queue * queue, void * buffer, size_t sz, struct remote_message_header * header) {
 	struct harbor_msg m;
@@ -118,6 +150,7 @@ push_queue(struct harbor_msg_queue * queue, void * buffer, size_t sz, struct rem
 	push_queue_msg(queue, &m);
 }
 
+/// 从 harbor_msg_queue 队列头弹出 harbor_msg
 static struct harbor_msg *
 pop_queue(struct harbor_msg_queue * queue) {
 	if (queue->head == queue->tail) {
@@ -128,6 +161,7 @@ pop_queue(struct harbor_msg_queue * queue) {
 	return slot;
 }
 
+/// 创建 harbor_msg_queue 对象
 static struct harbor_msg_queue *
 new_queue() {
 	struct harbor_msg_queue * queue = skynet_malloc(sizeof(*queue));
@@ -139,22 +173,26 @@ new_queue() {
 	return queue;
 }
 
+/// 释放 harbor_msg_queue 的资源, 包括所管理的 harbor_msg 的 buffer 指向的数据资源
 static void
 release_queue(struct harbor_msg_queue *queue) {
 	if (queue == NULL)
 		return;
+
 	struct harbor_msg * m;
 	while ((m=pop_queue(queue)) != NULL) {
 		skynet_free(m->buffer);
 	}
+
 	skynet_free(queue->data);
 	skynet_free(queue);
 }
 
+/// 从 hashmap 中搜索 key 与 name 相同的 keyvalue. 搜索到返回 keyvalue, 否则返回 NULL.
 static struct keyvalue *
 hash_search(struct hashmap * hash, const char name[GLOBALNAME_LENGTH]) {
 	uint32_t *ptr = (uint32_t*) name;
-	uint32_t h = ptr[0] ^ ptr[1] ^ ptr[2] ^ ptr[3];
+	uint32_t h = ptr[0] ^ ptr[1] ^ ptr[2] ^ ptr[3];	// 计算 hash 键
 	struct keyvalue * node = hash->node[h % HASH_SIZE];
 	while (node) {
 		if (node->hash == h && strncmp(node->key, name, GLOBALNAME_LENGTH) == 0) {
@@ -168,6 +206,7 @@ hash_search(struct hashmap * hash, const char name[GLOBALNAME_LENGTH]) {
 /*
 
 // Don't support erase name yet
+// 还不支持擦除名字
 
 static struct void
 hash_erase(struct hashmap * hash, char name[GLOBALNAME_LENGTH) {
@@ -187,12 +226,19 @@ hash_erase(struct hashmap * hash, char name[GLOBALNAME_LENGTH) {
 }
 */
 
+/// 向 hashmap 中插入 keyvalue, keyvalue 的 key 为 name.
 static struct keyvalue *
 hash_insert(struct hashmap * hash, const char name[GLOBALNAME_LENGTH]) {
 	uint32_t *ptr = (uint32_t *)name;
-	uint32_t h = ptr[0] ^ ptr[1] ^ ptr[2] ^ ptr[3];
+	uint32_t h = ptr[0] ^ ptr[1] ^ ptr[2] ^ ptr[3];		// 计算 hash 键
+
+	// 获得首 keyvalue 指针
 	struct keyvalue ** pkv = &hash->node[h % HASH_SIZE];
+
+	// 分配 keyvalue 内存
 	struct keyvalue * node = skynet_malloc(sizeof(*node));
+
+	// 赋值 keyvalue
 	memcpy(node->key, name, GLOBALNAME_LENGTH);
 	node->next = *pkv;
 	node->queue = NULL;
@@ -203,6 +249,7 @@ hash_insert(struct hashmap * hash, const char name[GLOBALNAME_LENGTH]) {
 	return node;
 }
 
+/// 创建 hashmap 对象
 static struct hashmap * 
 hash_new() {
 	struct hashmap * h = skynet_malloc(sizeof(struct hashmap));
@@ -210,10 +257,11 @@ hash_new() {
 	return h;
 }
 
+/// 删除 hashmap 及其关联的所有内存资源
 static void
 hash_delete(struct hashmap *hash) {
 	int i;
-	for (i=0;i<HASH_SIZE;i++) {
+	for (i = 0; i < HASH_SIZE; i++) {
 		struct keyvalue * node = hash->node[i];
 		while (node) {
 			struct keyvalue * next = node->next;
@@ -227,37 +275,48 @@ hash_delete(struct hashmap *hash) {
 
 ///////////////
 
+/// 关闭 id 对应的 slave 的连接
 static void
 close_harbor(struct harbor *h, int id) {
 	struct slave *s = &h->s[id];
 	s->status = STATUS_DOWN;
+
+	// 关闭与该 slave 的连接
 	if (s->fd) {
 		skynet_socket_close(h->ctx, s->fd);
 	}
+
+	// 释放 harbor_msg_queue 资源
 	if (s->queue) {
 		release_queue(s->queue);
 		s->queue = NULL;
 	}
 }
 
+/// 报告给 slave skynet_context 有 slave id 断开连接
 static void
 report_harbor_down(struct harbor *h, int id) {
 	char down[64];
-	int n = sprintf(down, "D %d",id);
+	int n = sprintf(down, "D %d", id);
 
 	skynet_send(h->ctx, 0, h->slave, PTYPE_TEXT, 0, down, n);
 }
 
+/// 创建 struct harbor 对象
 struct harbor *
 harbor_create(void) {
 	struct harbor * h = skynet_malloc(sizeof(*h));
-	memset(h,0,sizeof(*h));
+	memset(h, 0, sizeof(*h));
+
+	// 创建 hashmap
 	h->map = hash_new();
 	return h;
 }
 
+/// 释放 struct harbor 对象
 void
 harbor_release(struct harbor *h) {
+	// 关闭与 slave 的连接
 	int i;
 	for (i=1;i<REMOTE_MAX;i++) {
 		struct slave *s = &h->s[i];
@@ -265,12 +324,17 @@ harbor_release(struct harbor *h) {
 			close_harbor(h,i);
 			// don't call report_harbor_down.
 			// never call skynet_send during module exit, because of dead lock
+			// 不要调用 report_harbor_down 函数.
+			// 在模块退出的时, 永远不要调用 skynet_send, 因为会死锁.
 		}
 	}
+
+	// 释放 hashmap
 	hash_delete(h->map);
 	skynet_free(h);
 }
 
+/// 高位低字节存储数字数据
 static inline void
 to_bigendian(uint8_t *buffer, uint32_t n) {
 	buffer[0] = (n >> 24) & 0xff;
@@ -279,6 +343,7 @@ to_bigendian(uint8_t *buffer, uint32_t n) {
 	buffer[3] = n & 0xff;
 }
 
+/// 将 remote_message_header 数据存储到 message 中. 每 4 个字节存储对应的数据.
 static inline void
 header_to_message(const struct remote_message_header * header, uint8_t * message) {
 	to_bigendian(message , header->source);
@@ -286,6 +351,7 @@ header_to_message(const struct remote_message_header * header, uint8_t * message
 	to_bigendian(message+8 , header->session);
 }
 
+/// 低字节存储高位转化为实际数字
 static inline uint32_t
 from_bigendian(uint32_t n) {
 	union {
@@ -296,6 +362,7 @@ from_bigendian(uint32_t n) {
 	return u.bytes[0] << 24 | u.bytes[1] << 16 | u.bytes[2] << 8 | u.bytes[3];
 }
 
+/// 从 message 中读出 remote_message_header 数据
 static inline void
 message_to_header(const uint32_t *message, struct remote_message_header *header) {
 	header->source = from_bigendian(message[0]);
@@ -308,12 +375,20 @@ message_to_header(const uint32_t *message, struct remote_message_header *header)
 static void
 forward_local_messsage(struct harbor *h, void *msg, int sz) {
 	const char * cookie = msg;
+
+	// 指针移到最后 HEADER_COOKIE_LENGTH 的位置处
 	cookie += sz - HEADER_COOKIE_LENGTH;
+
+	// 读取 remote_message_header 的数据
 	struct remote_message_header header;
 	message_to_header((const uint32_t *)cookie, &header);
 
 	uint32_t destination = header.destination;
+
+	// 获得消息类型
 	int type = (destination >> HANDLE_REMOTE_SHIFT) | PTYPE_TAG_DONTCOPY;
+
+	// 高 8 位存储节点 id
 	destination = (destination & HANDLE_MASK) | ((uint32_t)h->id << HANDLE_REMOTE_SHIFT);
 
 	if (skynet_send(h->ctx, header.source, destination, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH) < 0) {

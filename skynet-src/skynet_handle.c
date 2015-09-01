@@ -13,8 +13,8 @@
 
 // 为了 handle 和 name 相互查询的数据结构
 struct handle_name {
-	char * name;
-	uint32_t handle;
+	char * name;			// 注册的名字
+	uint32_t handle;		// skynet_context handle
 };
 
 // handle 的管理器, 管理进程(节点) context/handle/name 之间的关联

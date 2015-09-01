@@ -52,7 +52,7 @@ struct skynet_context {
 	struct message_queue *queue;	// 消息队列
 	FILE * logfile;					// 日志文件句柄
 	char result[32];				// 将 cmd_xxx 运算的一些值存储在 result 里面
-	uint32_t handle;				// 在当前 skynet 节点中的 handle, 由 skynet_handle 分配
+	uint32_t handle;				// 在当前 skynet 节点中的 handle, 由 skynet_handle 分配, 高 8 为存储所属的 harbor
 	int session_id;					// session 的累计计数
 	int ref;						// 引用计数
 	bool init;						// 是否初始化
