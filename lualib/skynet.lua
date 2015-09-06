@@ -313,7 +313,7 @@ function suspend(co, result, command, param, size)
 		local f = param		-- pack
 
 		-- 第一个参数通常是 true 表示是一个正常的回应，之后的参数是需要回应的数据。
-		-- 如果是 false ，则给请求者抛出一个异常。它的返回值表示回应的地址是否还有效。
+		-- 如果是 false ，则给请求者响应一个错误。它的返回值表示回应的地址是否还有效。
 		-- 如果你仅仅想知道回应地址的有效性，那么可以在第一个参数传入 "TEST" 用于检测。
 		local function response(ok, ...)
 			-- 验证回应地址的有效性
