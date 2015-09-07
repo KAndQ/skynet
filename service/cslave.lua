@@ -237,7 +237,7 @@ function harbor.REGISTER(fd, name, handle)
 	-- 响应之前的查询
 	response_name(name)
 
-	-- 给连接主机发送信息
+	-- 给 master 发送信息
 	socket.write(fd, pack_package("R", name, handle))
 
 	-- 给 harbor 服务发送更新全局名字命令
