@@ -1,3 +1,6 @@
+-- 这个服务主要处理着与 master 的逻辑, 同时作为一个中间转发, 将消息传送给 service_harbor.c 服务.
+-- 也处理着由 service_harbor.c 从各个 slave 节点接收并且转发过来的消息.
+
 local skynet = require "skynet"
 local socket = require "socket"
 require "skynet.manager"	-- import skynet.launch, ...
@@ -71,7 +74,7 @@ local function connect_slave(slave_id, address)
 
 			-- 将 socket id 转交 harbor 服务
 			socket.abandon(fd)
-			skynet.send(harbor_service, "harbor", string.format("S %d %d",fd,slave_id))
+			skynet.send(harbor_service, "harbor", string.format("S %d %d", fd, slave_id))
 		end
 	end)
 
@@ -109,7 +112,7 @@ local function response_name(name)
 	end
 end
 
--- 和 master 连接的监控逻辑处理
+-- 和 master 连接的监控逻辑处理, 专门打开 1 个协程来处理.
 local function monitor_master(master_fd)
 	while true do
 		local ok, t, id_name, address = pcall(read_package, master_fd)
@@ -281,7 +284,7 @@ function harbor.QUERYNAME(fd, name)
 		return
 	end
 
-	-- 之前已经记录, 则直接回应
+	-- 之前已经记录, 则直接回应服务地址
 	local result = globalname[name]
 	if result then
 		skynet.ret(skynet.pack(result))

@@ -6,7 +6,12 @@ local socket = require "socket"
 		1. all the slaves address : id -> ipaddr:port
 		2. all the global names : name -> address
 
-	master hold connections from slaves .
+	master 管理数据:
+		1. 全部的 slaves 主机地址: id -> ipaddr:port
+		2. 全部的全剧名字: name -> address
+
+	master hold connections from slaves.
+	master 控制来自节点的连接.
 
 	protocol slave->master :
 		package size 1 byte
@@ -14,7 +19,12 @@ local socket = require "socket"
 			'H' : HANDSHAKE, report slave id, and address.
 			'R' : REGISTER name address
 			'Q' : QUERY name
-
+	slave->master 协议:
+		包大小使用 1 字节表示
+		1 字节表示命令类型
+			'H' : 握手, 发送 slave id 和主机地址.
+			'R' : 注册服务全局名字, 发送 name 和 handle
+			'Q' : 查询全局名字
 
 	protocol master->slave:
 		package size 1 byte
@@ -23,11 +33,22 @@ local socket = require "socket"
 			'C' : CONNECT slave_id slave_address
 			'N' : NAME globalname address
 			'D' : DISCONNECT slave_id
+	master->slave 协议:
+		包大小使用 1 字节表示
+		1 字节表示命令类型
+			'W' : 等待连接, 发送 n 表示需要等待连接节点的数量
+			'C' : 连接节点, 发送 slave id 和 slave 主机地址
+			'N' : 更新全局名字, 发送全局名字和服务地址
+			'D' : 断开 slave 连接, 发送断开的 slave id
 ]]
 
+-- 管理的 slave 节点
 local slave_node = {}
+
+-- 管理的服务的全局名字
 local global_name = {}
 
+-- 从 socket 读取 1 个数据包, 然后将读取的数据解析成 lua 对象返回, 详细参考 cslave.lua, 有相同的函数
 local function read_package(fd)
 	local sz = socket.read(fd, 1)
 	assert(sz, "closed")
@@ -36,6 +57,7 @@ local function read_package(fd)
 	return skynet.unpack(content)
 end
 
+-- 将 lua 对象打包成字符串的形式存储, 格式为: 数据长度 + 序列化数据, 详细参考 cslave.lua, 有相同的函数
 local function pack_package(...)
 	local message = skynet.packstring(...)
 	local size = #message

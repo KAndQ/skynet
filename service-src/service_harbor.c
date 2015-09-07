@@ -1,3 +1,9 @@
+/*
+该服务的主要功能: 与各个 slave 节点的通信由这个模块处理.
+在更底层处理着和各个 slave 节点的关系, 同时接收来自 .slave 服务传来的消息间接的处理与 master 的关系.
+各个 slave 发来的消息, 该服务会视情况将数据转发给 .slave 服务.
+ */
+
 #include "skynet.h"
 #include "skynet_harbor.h"
 #include "skynet_socket.h"
