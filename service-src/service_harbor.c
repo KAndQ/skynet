@@ -734,7 +734,7 @@ remote_send_handle(struct harbor *h, uint32_t source, uint32_t destination, int 
 	return 0;
 }
 
-/// 发送数据给 name
+/// 发送数据给 name 对应的服务, 如果当前没有记录 name, 那么先发送查询请求给 .cslave 服务
 static int
 remote_send_name(struct harbor *h, uint32_t source, const char name[GLOBALNAME_LENGTH], int type, int session, const char * msg, size_t sz) {
 	// 查询 keyvalue

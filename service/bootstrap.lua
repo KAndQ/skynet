@@ -40,7 +40,7 @@ skynet.start(function()
 		skynet.name(".cslave", slave)
 	end
 
-	-- 启动 DataCenter 服务
+	-- 如果当前包含 master, 则启动 DataCenter 服务
 	-- datacenter 可用来在整个 skynet 网络做跨节点的数据共享。
 	if standalone then
 		local datacenter = skynet.newservice "datacenterd"

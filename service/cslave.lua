@@ -1,5 +1,6 @@
 -- 这个服务主要处理着与 master 的逻辑, 同时作为一个中间转发, 将消息传送给 service_harbor.c 服务.
 -- 也处理着由 service_harbor.c 从各个 slave 节点接收并且转发过来的消息.
+-- harbor 和 slave 可以理解为是同一个意思.
 
 local skynet = require "skynet"
 local socket = require "socket"
@@ -64,7 +65,7 @@ local function connect_slave(slave_id, address)
 	local ok, err = pcall(function()
 		if slaves[slave_id] == nil then
 			-- socket 连接
-			local fd = assert(socket.open(address), "Can't connect to "..address)
+			local fd = assert(socket.open(address), "Can't connect to " .. address)
 			skynet.error(string.format("Connect to harbor %d (fd=%d), %s", slave_id, fd, address))
 
 			-- 记录连接的 slave id 和 socket id
@@ -91,7 +92,7 @@ local function ready()
 
 	-- 连接 connect_queue 里面的 slave
 	for k, v in pairs(queue) do
-		connect_slave(k,v)
+		connect_slave(k, v)
 	end
 
 	-- 向 harbor 服务更新全局名字
@@ -112,13 +113,13 @@ local function response_name(name)
 	end
 end
 
--- 和 master 连接的监控逻辑处理, 专门打开 1 个协程来处理.
+-- 和 master 连接的逻辑处理, 专门打开 1 个协程来处理.
 local function monitor_master(master_fd)
 	while true do
 		local ok, t, id_name, address = pcall(read_package, master_fd)
 		if ok then
-			if t == 'C' then	-- 向 connect_queue 添加 slave id 和 address, 或者直接连接 slave, 这种情况是还未调用 ready() 函数
-				if connect_queue then
+			if t == 'C' then	-- 向 connect_queue 添加 slave id 和 address, 或者直接连接 slave
+				if connect_queue then	-- 这种情况是还未调用 ready() 函数, 但是 master 已经向当前 slave 发送连接通知了
 					connect_queue[id_name] = address
 				else
 					connect_slave(id_name, address)
@@ -196,7 +197,7 @@ skynet.register_protocol {
 	unpack = skynet.tostring,
 }
 
--- 返回 1 个函数, 用于处理 text 类型的消息
+-- 返回 1 个函数, 用于处理 text 类型的消息, 用于处理由 service_harbor 服务发来的数据
 local function monitor_harbor(master_fd)
 	return function(session, source, command)
 		-- 获得命令
@@ -247,7 +248,9 @@ function harbor.REGISTER(fd, name, handle)
 	skynet.redirect(harbor_service, handle, "harbor", 0, "N " .. name)
 end
 
--- 如果和 slave 连接, 那么将回应压入 monitor 队列, 否则直接发送回应.
+-- 当 id 对应的 slave 断开连接或者关闭连接的时候, 响应.
+-- @param fd master socket id
+-- @param id slave id
 function harbor.LINK(fd, id)
 	if slaves[id] then
 		if monitor[id] == nil then
@@ -259,12 +262,14 @@ function harbor.LINK(fd, id)
 	end
 end
 
--- 将回应压入 monitor_master_set
+-- 将回应压入 monitor_master_set, 与 master 断开连接的时候会回应
 function harbor.LINKMASTER()
 	table.insert(monitor_master_set, skynet.response())
 end
 
--- 与 harbor.LINK 函数功能相同
+-- 当 id 对应的 slave 已经连接或者连接成功的时候, 响应.
+-- @param fd master socket id
+-- @param id slave id
 function harbor.CONNECT(fd, id)
 	if not slaves[id] then
 		if monitor[id] == nil then
@@ -320,7 +325,7 @@ skynet.start(function()
 	local master_fd = assert(socket.open(master_addr), "Can't connect to master")
 
 	-- 注册 lua 协议处理函数
-	skynet.dispatch("lua", function (_,_,command,...)
+	skynet.dispatch("lua", function (_, _, command, ...)
 		local f = assert(harbor[command])
 		f(master_fd, ...)
 	end)
@@ -345,6 +350,8 @@ skynet.start(function()
 	skynet.fork(monitor_master, master_fd)
 
 	-- 等待其他的节点与当前节点连接
+	-- 有个小细节, 涉及到 socket_server.c 的底层实现, 只有在 socket.start 之后, 该 socket 才是可用的,
+	-- 因为这个时候, 该 socket 才会被添加到底层的 event pool 中.
 	if n > 0 then
 		local co = coroutine.running()
 		socket.start(slave_fd, function(fd, addr)

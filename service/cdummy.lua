@@ -75,12 +75,12 @@ function harbor.QUERYNAME(name)
 	end
 end
 
--- 直接回应, 本来应该是在对应的 slave 退出时才回应.
+-- 直接回应, 因为没有和任何的 slave 连接. 详细查看 cslave.lua
 function harbor.LINK(id)
 	skynet.ret()
 end
 
--- 不支持...
+-- 一定是一直保持的连接的, 详细查看 cslave.lua
 function harbor.CONNECT(id)
 	skynet.error("Can't connect to other harbor in single node mode")
 end

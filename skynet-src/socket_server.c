@@ -1705,7 +1705,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 		case SOCKET_TYPE_LISTEN:		// 此时这个 socket 正在 listen
 			if (report_accept(ss, s, result)) {
 				return SOCKET_ACCEPT;
-			} 
+			}
 			break;
 		case SOCKET_TYPE_INVALID:
 			fprintf(stderr, "socket-server: invalid socket\n");

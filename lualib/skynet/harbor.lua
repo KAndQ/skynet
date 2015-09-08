@@ -15,12 +15,12 @@ function harbor.queryname(name)
 	return skynet.call(".cslave", "lua", "QUERYNAME", name)
 end
 
--- 当前协程阻塞, 当 id 对应的 slave 被请求关闭的时候, 当前的协程才会被唤醒
+-- 阻塞当前协程, 当 id 对应的 slave 断开连接的时候才唤醒该协程
 function harbor.link(id)
 	skynet.call(".cslave", "lua", "LINK", id)
 end
 
--- 同 link 函数
+-- 阻塞当前协程, 当 id 对应的 slave 连接的时候才唤醒该协程
 function harbor.connect(id)
 	skynet.call(".cslave", "lua", "CONNECT", id)
 end
