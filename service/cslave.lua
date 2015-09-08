@@ -117,7 +117,7 @@ local function monitor_master(master_fd)
 	while true do
 		local ok, t, id_name, address = pcall(read_package, master_fd)
 		if ok then
-			if t == 'C' then	-- 向 connect_queue 添加 slave id 和 address, 或者直接连接 slave
+			if t == 'C' then	-- 向 connect_queue 添加 slave id 和 address, 或者直接连接 slave, 这种情况是还未调用 ready() 函数
 				if connect_queue then
 					connect_queue[id_name] = address
 				else
@@ -335,7 +335,7 @@ skynet.start(function()
 	local hs_message = pack_package("H", harbor_id, slave_address)
 	socket.write(master_fd, hs_message)
 
-	-- 拿到 master 的响应数据
+	-- 拿到 master 的响应数据, 等待握手结束
 	local t, n = read_package(master_fd)
 	assert(t == "W" and type(n) == "number", "slave shakehand failed")
 

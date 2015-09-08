@@ -65,7 +65,10 @@ local function pack_package(...)
 	return string.char(size) .. message
 end
 
+-- 报告其他的 slave, 连接 slave_id 和 slave_addr 表示的 slave, 同时告诉 fd 对应的 slave 需要等待连接的数量
 local function report_slave(fd, slave_id, slave_addr)
+
+	-- 告诉其他的 slave, 需要新连接的 slave
 	local message = pack_package("C", slave_id, slave_addr)
 	local n = 0
 	for k,v in pairs(slave_node) do
@@ -74,40 +77,65 @@ local function report_slave(fd, slave_id, slave_addr)
 			n = n + 1
 		end
 	end
+
+	-- 告诉 fd 对应的 slave 等待连接的数量
 	socket.write(fd, pack_package("W", n))
 end
 
+-- fd 对应的 slave 发来'握手'请求, master 将这个请求报告给其他的 slave, 通知其他的 slave 去连接 fd 对应的 slave
+-- 返回请求'握手'的 slave 的 id 和主机地址
 local function handshake(fd)
 	local t, slave_id, slave_addr = read_package(fd)
-	assert(t=='H', "Invalid handshake type " .. t)
+
+	-- 确认是'握手'请求
+	assert(t == 'H', "Invalid handshake type " .. t)
+
+	-- 确认是有效的 id
 	assert(slave_id ~= 0 , "Invalid slave id 0")
+
+	-- 确认之前没有记录过, slave id 是当前 skynet 网络唯一
 	if slave_node[slave_id] then
 		error(string.format("Slave %d already register on %s", slave_id, slave_node[slave_id].addr))
 	end
+
+	-- 通知其他 slave 去连接 fd 对应的 slave
 	report_slave(fd, slave_id, slave_addr)
+
+	-- 记录 fd 对应的 slave 数据
 	slave_node[slave_id] = {
 		fd = fd,
 		id = slave_id,
 		addr = slave_addr,
 	}
+
 	return slave_id , slave_addr
 end
 
+-- master 与 slave 的逻辑处理
+-- 当前只是处理'注册全局名字'和 '查询全局名字'请求
 local function dispatch_slave(fd)
 	local t, name, address = read_package(fd)
 	if t == 'R' then
 		-- register name
-		assert(type(address)=="number", "Invalid request")
+		-- 服务注册全局名字
+		assert(type(address) == "number", "Invalid request")
+
+		-- 记录全局名字
 		if not global_name[name] then
 			global_name[name] = address
 		end
+
+		-- 通知各个 slave 更新全局名字
 		local message = pack_package("N", name, address)
 		for k,v in pairs(slave_node) do
 			socket.write(v.fd, message)
 		end
 	elseif t == 'Q' then
 		-- query name
+		-- 查询名字
 		local address = global_name[name]
+
+		-- 如果存在此服务地址, 发送更新全局名字命令给该 slave
 		if address then
 			socket.write(fd, pack_package("N", name, address))
 		end
@@ -116,11 +144,15 @@ local function dispatch_slave(fd)
 	end
 end
 
+-- 专门为 slave 开启的协程调度函数
 local function monitor_slave(slave_id, slave_address)
 	local fd = slave_node[slave_id].fd
 	skynet.error(string.format("Harbor %d (fd=%d) report %s", slave_id, fd, slave_address))
+
 	while pcall(dispatch_slave, fd) do end
-	skynet.error("slave " ..slave_id .. " is down")
+	skynet.error("slave " .. slave_id .. " is down")
+
+	-- 通知其他 slave, slave_id 对应的 slave 关闭了
 	local message = pack_package("D", slave_id)
 	slave_node[slave_id].fd = 0
 	for k,v in pairs(slave_node) do
@@ -133,12 +165,16 @@ skynet.start(function()
 	local master_addr = skynet.getenv "standalone"
 	skynet.error("master listen socket " .. tostring(master_addr))
 	local fd = socket.listen(master_addr)
-	socket.start(fd , function(id, addr)
+
+	socket.start(fd, function(id, addr)
 		skynet.error("connect from " .. addr .. " " .. id)
 		socket.start(id)
+
+		-- 等待其他 slave 发送'握手'请求
 		local ok, slave, slave_addr = pcall(handshake, id)
+
 		if ok then
-			skynet.fork(monitor_slave, slave, slave_addr)
+			skynet.fork(monitor_slave, slave, slave_addr)	-- 开启 1 个协程, 用来处理与各个 slave 的逻辑
 		else
 			skynet.error(string.format("disconnect fd = %d, error = %s", id, slave))
 			socket.close(id)
