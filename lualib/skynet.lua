@@ -105,6 +105,7 @@ local watching_session = {}
 -- 已经无效的服务集合, 键是服务的地址(整型), 值是布尔类型 true
 -- 如果 [其他服务] 给 [当前服务] 发来 PTYPE_ERROR 类型消息, 并且 [其他服务] 在 watching_service 里面(正在监控), 
 -- 那么则将 [其他服务] 加入到 dead_service 里面, [当前服务] 认为这个 [其他服务] 是 dead.
+-- 如果是在 dead_service 里面的 [其他服务], [当前服务] 将不会再响应.
 local dead_service = {}
 
 -- 错误队列, 存放的是 session 的数组, 产生错误的 session 都放在此数组里面
@@ -140,7 +141,7 @@ local function dispatch_error_queue()
 end
 
 -- 将产生错误的 session 压入到 error_queue 中.
--- 如果 error_session == 0, 那么所有与 error_source 相关的 session 将被压入;
+-- 如果 error_session == 0, 那么所有与 error_source 相关的 session 将被压入, 同时将 error_source 标记为'死亡服务';
 -- 否则, 只压入 error_session 到 error_queue 中.
 local function _error_dispatch(error_session, error_source)
 	if error_session == 0 then

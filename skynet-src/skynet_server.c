@@ -1008,7 +1008,7 @@ skynet_sendname(struct skynet_context * context, uint32_t source, const char * a
 
 		struct remote_message * rmsg = skynet_malloc(sizeof(*rmsg));
 		copy_name(rmsg->destination.name, addr);
-		rmsg->destination.handle = 0;
+		rmsg->destination.handle = 0;	// 标记为 0, 表示使用了 name
 		rmsg->message = data;
 		rmsg->sz = sz;
 
