@@ -54,11 +54,12 @@ end
 
 skynet.start(function()
 	local init = false
-	local function dispatcher( session , source , id, ...)
+	local function dispatcher(session, source , id, ...)
 		local method = func[id]
 
 		if method[2] == "system" then
 			local command = method[3]
+
 			if command == "hotfix" then
 				local hotfix = require "snax.hotfix"
 				skynet.ret(skynet.pack(hotfix(func, ...)))

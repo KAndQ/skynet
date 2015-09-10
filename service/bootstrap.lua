@@ -47,7 +47,7 @@ skynet.start(function()
 		skynet.name("DATACENTER", datacenter)
 	end
 
-	-- 启动用于 UniqueService 管理的 service_mgr
+	-- 启动用于 UniqueService 管理的 service_mgr, 启动这个服务的时候已经加载了 snax 模块
 	skynet.newservice "service_mgr"
 
 	-- 启动用户定义的服务

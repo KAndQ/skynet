@@ -126,7 +126,7 @@ local function monitor_master(master_fd)
 				end
 			elseif t == 'N' then	-- 更新全局名字
 				globalname[id_name] = address
-				response_name(id_name)
+				response_name(id_name)	-- 响应等待的查询
 				if connect_queue == nil then
 					skynet.redirect(harbor_service, address, "harbor", 0, "N " .. id_name)
 				end
