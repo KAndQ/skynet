@@ -240,6 +240,8 @@ end
 -- 热更新 snax 服务（只能热更新 snax 框架编写的 lua 服务）
 -- @param obj snax 服务对象
 -- @param source 热更新代码字符串
+-- @param ... source 里面的 hotfix 函数运行需要的参数
+-- @return source 里面的 hotfix 函数的返回值
 function snax.hotfix(obj, source, ...)
 	local t = snax.interface(obj.type)
 	return test_result(skynet_call(obj.handle, "snax", t.system.hotfix, source, ...))

@@ -2,7 +2,10 @@ local skynet = require "skynet"
 require "skynet.manager"	-- import skynet.register
 local snax = require "snax"
 
+-- 函数功能集
 local cmd = {}
+
+-- 
 local service = {}
 
 local function request(name, func, ...)
@@ -141,6 +144,7 @@ local function register_global()
 	end
 end
 
+-- 如果当前节点是 slave 节点, 那么将使用这个注册函数
 local function register_local()
 	function cmd.GLAUNCH(name, ...)
 		local global_name = "@" .. name
@@ -175,13 +179,17 @@ skynet.start(function()
 			skynet.ret(skynet.pack(nil, r))
 		end
 	end)
+
+	-- 注册 .service, 如果已经启动过该服务, 无法再次启动
 	local handle = skynet.localname ".service"
-	if  handle then
+	if handle then
 		skynet.error(".service is already register by ", skynet.address(handle))
 		skynet.exit()
 	else
 		skynet.register(".service")
 	end
+
+	-- 如果当前是 master 节点, 那么注册全局服务名
 	if skynet.getenv "standalone" then
 		skynet.register("SERVICE")
 		register_global()

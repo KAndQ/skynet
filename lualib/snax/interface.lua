@@ -7,7 +7,7 @@ local skynet = require "skynet"
 -- @param loader 加载 snax 服务的加载器
 -- @return 返回两个参数: snax 服务定义的函数集合和匹配的模式
 return function (name, G, loader)
-	loader = loader or loadfile
+	loader = loader or loadfile	-- 可以联系 snax.hotfix.lua 源码, 理解更深刻
 	local mainfunc
 
 	-- 返回 1 个表, 该表在更新的时候只接收函数作为值
@@ -110,7 +110,7 @@ return function (name, G, loader)
 		-- 从配置路径中搜索到 snax 服务文件
 		for pat in string.gmatch(path,"[^;]+") do
 			local filename = string.gsub(pat, "?", name)
-			local f , err = loader(filename, "bt", G)	-- G 作为接下来加载模块的全局环境
+			local f , err = loader(filename, "bt", G)	-- G 作为接下来加载模块的环境
 			if f then
 				pattern = pat
 				mainfunc = f
