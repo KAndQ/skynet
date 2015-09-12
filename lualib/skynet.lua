@@ -782,7 +782,7 @@ end
 -- 如果被启动的脚本在初始化环节抛出异常，或在初始化完成前就调用 skynet.exit 退出，｀skynet.newservice` 都会抛出异常。
 -- 如果被启动的脚本的 start 函数是一个永不结束的循环，那么 newservice 也会被永远阻塞住。
 function skynet.newservice(name, ...)
-	return skynet.call(".launcher", "lua" , "LAUNCH", "snlua", name, ...)
+	return skynet.call(".launcher", "lua", "LAUNCH", "snlua", name, ...)
 end
 
 -- skynet.uniqueservice 和 skynet.newservice 的输入参数相同，都可以以一个脚本名称找到一段 lua 脚本并启动它，返回这个服务的地址。
@@ -812,7 +812,7 @@ end
 --  用于把一个地址数字转换为一个可用于阅读的字符串。
 function skynet.address(addr)
 	if type(addr) == "number" then
-		return string.format(":%08x",addr)
+		return string.format(":%08x", addr)
 	else
 		return tostring(addr)
 	end
@@ -915,6 +915,8 @@ end
 -- 但是，不要在外面调用 skynet 的阻塞 API ，因为框架将无法唤醒它们。
 function skynet.start(start_func)
 	c.callback(skynet.dispatch_message)
+
+	-- 之所以要计时, 为的是让新的开启的服务能够在自己的消息调度时初始化, 保证是由消息(skynet_message)来驱动 sknyet_context 工作.
 	skynet.timeout(0, function()
 		skynet.init_service(start_func)
 	end)

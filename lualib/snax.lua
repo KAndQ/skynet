@@ -75,7 +75,7 @@ local skynet_call = skynet.call
 
 -- 封装 post 功能, 只发送. 可以参考上面的介绍.
 -- @param type typeclass 的值
--- @param handle skynet_context handle, 即 snax 服务的 skynet 服务地址。
+-- @param handle skynet_context handle, 即 snax 服务的 skynet_context 服务地址。
 -- @return table, 该 table 比较特殊, 例如: t.name(...) 表示将 "name" 和 ... 作为参数发送给 handle 对应的服务
 local function gen_post(type, handle)
 	return setmetatable({} , {
@@ -92,7 +92,7 @@ end
 
 -- 封装 request 功能, 发送并且等待响应. 可以参考上面的介绍.
 -- @param type typeclass 的值
--- @param handle skynet_context handle, 即 snax 服务的 skynet 服务地址。
+-- @param handle skynet_context handle, 即 snax 服务的 skynet_context 服务地址。
 -- @return table, 该 table 比较特殊, 例如: local v = t.name(...) 表示将 "name" 和 ... 作为参数发送给 handle 对应的服务, 并且阻塞等待对应的服务响应.
 local function gen_req(type, handle)
 	return setmetatable({} , {

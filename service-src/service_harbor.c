@@ -926,7 +926,7 @@ mainloop(struct skynet_context * context, void * ud, int type, int session, uint
 	}
 
 	case PTYPE_HARBOR: {
-		harbor_command(h, msg,sz,session,source);
+		harbor_command(h, msg, sz, session, source);
 		return 0;
 	}
 
@@ -961,7 +961,7 @@ harbor_init(struct harbor *h, struct skynet_context *ctx, const char * args) {
 		return 1;
 	}
 	h->id = harbor_id;	// harbor id
-	h->slave = slave;	// skynet_context handle
+	h->slave = slave;	// .slave skynet_context handle
 	skynet_callback(ctx, h, mainloop);
 	skynet_harbor_start(ctx);
 
