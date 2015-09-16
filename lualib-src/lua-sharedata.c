@@ -768,6 +768,7 @@ int
 luaopen_sharedata_core(lua_State *L) {
 	luaL_Reg l[] = {
 		// used by host
+		// 用于主机
 		{ "new", lnewconf },
 		{ "delete", ldeleteconf },
 		{ "markdirty", lmarkdirty },
@@ -776,6 +777,7 @@ luaopen_sharedata_core(lua_State *L) {
 		{ "decref", ldecref },
 
 		// used by client
+		// 用于客户端
 		{ "box", lboxconf },
 		{ "index", lindexconf },
 		{ "nextkey", lnextkey },

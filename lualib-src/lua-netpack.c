@@ -41,6 +41,7 @@ struct uncomplete {
 	int header;		// 当 read == -1 时, 存储能够读取到 1 个字节包头数据
 };
 
+/// 
 struct queue {
 	int cap;		// 队列总大小
 	int head;		// 队列头
@@ -53,6 +54,7 @@ struct queue {
 static void
 clear_list(struct uncomplete * uc) {
 	while (uc) {
+		skynet_free(uc->pack.buffer);
 		void * tmp = uc;
 		uc = uc->next;
 		skynet_free(tmp);
@@ -511,6 +513,7 @@ lpop(lua_State *L) {
 		q->head = 0;
 	}
 
+	// 记得释放 lightuserdata 指向的内存数据
 	lua_pushinteger(L, np->id);
 	lua_pushlightuserdata(L, np->buffer);
 	lua_pushinteger(L, np->size);
@@ -564,6 +567,8 @@ lpack(lua_State *L) {
 	write_size(buffer, len);
 	memcpy(buffer+2, ptr, len);
 
+	// 返回一个lightuserdata 和一个 number 。
+	// 你可以直接送到 socket.write 发送（socket.write 负责最终释放内存）。
 	lua_pushlightuserdata(L, buffer);
 	lua_pushinteger(L, len + 2);
 

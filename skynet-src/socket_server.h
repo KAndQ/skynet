@@ -75,9 +75,16 @@ int socket_server_connect(struct socket_server *, uintptr_t opaque, const char *
 /// 请求将指定的 fd 设置为 bind 状态
 int socket_server_bind(struct socket_server *, uintptr_t opaque, int fd);
 
+/*
+Nagle算法用于对缓冲区内的一定数量的消息进行自动连接。该处理过程(称为Nagling)，通过减少必须发送的封包的数量，
+提高了网络应用 程序系统的效率。（Nagle虽然解决了小封包问题，但也导致了较高的不可预测的延迟，同时降低了吞吐量。）
+
+vc下面socket编程，使用阻塞方式的时候，会自动使用Nagle算法，如：当pc不断发送32Bytes的数据的时候，会将这些包合并起来一起发送。
+如果另一头使用的时候一个tcp包一条命令处理的话，会出问题的。
+*/
 // for tcp
 // 适用于 tcp
-/// 请求设置 id 对应的 tcp 禁用 nagle 算法
+/// 请求设置 id 对应的 tcp 禁用 Nagle 算法
 void socket_server_nodelay(struct socket_server *, int id);
 
 struct socket_udp_address;

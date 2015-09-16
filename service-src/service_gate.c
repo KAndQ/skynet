@@ -1,3 +1,7 @@
+// 网管服务器的实现, 客户端与连接这个服务连接, 这个服务接收到数据之后, 伪造 client 给 agent 发送接收到的数据, 由 agent 处理实际的逻辑.
+// 这个服务实际上只是做数据的转发与 socket 的连接管理.
+// 这个服务貌似目前已经不使用了, 而是直接使用 gateserver.lua + gate.lua + watchdog.lua 来代替.
+
 #include "skynet.h"
 #include "skynet_socket.h"
 #include "databuffer.h"
@@ -14,9 +18,9 @@
 
 struct connection {
 	int id;	// skynet_socket id
-	uint32_t agent;					// skynet_context handle
+	uint32_t agent;					// skynet_context handle, 负责逻辑处理的服务
 	uint32_t client;				// skynet_context handle
-	char remote_name[32];
+	char remote_name[32];			// 连接客户端的主机地址
 	struct databuffer buffer;		// 接收数据
 };
 
@@ -25,7 +29,7 @@ struct gate {
 	int listen_id;					// 侦听连接的 socket id
 	uint32_t watchdog;				// skynet_context handle
 	uint32_t broker;				// skynet_context handle
-	int client_tag;
+	int client_tag;					// PTYPE_CLIENT
 	int header_size;				// 数据包包头的长度
 	int max_connection;				// 最大的连接数量
 	struct hashid hash;				// hash 表, 存储的 id 就是 socket id, 而返回的值用于 connection 数组的索引
@@ -339,9 +343,9 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 	struct gate *g = ud;
 	switch(type) {
 	case PTYPE_TEXT:
-		_ctrl(g , msg , (int)sz);
+		_ctrl(g, msg, (int)sz);
 		break;
-	case PTYPE_CLIENT: {
+	case PTYPE_CLIENT: {	// 如果其他的服务回的是 PTYPE_CLIENT 类型的消息, 表示 service_gate 要把消息返回给连接的终端
 		if (sz <= 4) {
 			skynet_error(ctx, "Invalid client message from %x", source);
 			break;

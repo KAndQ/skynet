@@ -27,7 +27,7 @@ struct hashid {
 	// 当向 hash.id 中插入 id 的时候, 使用的索引是可用的索引
 	struct hashid_node *id;
 
-	// 管理 hash_node 的指针(栈)
+	// 管理 hash_node 的指针(栈), 主要用于查询
 	// 当向 hash.hash 中插入 id 的时候, 使用的索引是与 hash.mod 取模运算后的值
 	struct hashid_node **hash;
 };

@@ -566,7 +566,7 @@ local udp_socket = {}	-- 暂时没有使用
 local function create_udp_object(id, cb)
 	socket_pool[id] = {
 		id = id,	-- socket id
-		connected = true,	-- 连接配置,
+		connected = true,	-- 连接标志
 		protocol = "UDP",	-- 协议类型
 		callback = cb,	-- 基于 udp 协议的 socket, 当接收到数据时的回调
 	}
