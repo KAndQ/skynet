@@ -935,7 +935,9 @@ skynet_send(struct skynet_context * context, uint32_t source, uint32_t destinati
 	// 数据大小的判断
 	if ((sz & MESSAGE_TYPE_MASK) != sz) {
 		skynet_error(context, "The message to %x is too large", destination);
-		skynet_free(data);
+		if (type & PTYPE_TAG_DONTCOPY) {
+			skynet_free(data);
+		}
 		return -1;
 	}
 

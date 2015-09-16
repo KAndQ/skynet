@@ -321,6 +321,7 @@ function suspend(co, result, command, param, size)
 			if ok == "TEST" then
 				if dead_service[co_address] then
 					release_watching(co_address)
+					unresponse[response] = nil
 					f = false
 					return false
 				else
@@ -371,7 +372,7 @@ function suspend(co, result, command, param, size)
 		watching_service[co_address] = watching_service[co_address] + 1
 
 		-- 记录 coroutine 对应的 response 函数
-		session_response[co] = response
+		session_response[co] = true
 
 		-- 记录 response 函数
 		unresponse[response] = true

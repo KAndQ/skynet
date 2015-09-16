@@ -404,8 +404,12 @@ forward_local_messsage(struct harbor *h, void *msg, int sz) {
 	// 给 destination 发送消息
 	if (skynet_send(h->ctx, header.source, destination, type, (int)header.session, (void *)msg, sz-HEADER_COOKIE_LENGTH) < 0) {
 		// 如果发送失败, 给 source 发送错误信息
-		skynet_send(h->ctx, destination, header.source , PTYPE_ERROR, (int)header.session, NULL, 0);
-		skynet_error(h->ctx, "Unknown destination :%x from :%x", destination, header.source);
+		if (type != PTYPE_ERROR) {
+			// don't need report error when type is error
+			// 当消息类型是 error 时, 不需要报告错误
+			skynet_send(h->ctx, destination, header.source , PTYPE_ERROR, (int)header.session, NULL, 0);
+		}
+		skynet_error(h->ctx, "Unknown destination :%x from :%x type(%d)", destination, header.source, type);
 	}
 }
 

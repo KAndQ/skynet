@@ -160,18 +160,25 @@ function gateserver.start(handler)
 
 	-- 对应 TYPE_CLOSE
 	function MSG.close(fd)
-		if handler.disconnect then
-			handler.disconnect(fd)
+		if fd ~= socket then
+			if handler.disconnect then
+				handler.disconnect(fd)
+			end
+			close_fd(fd)
 		end
-		close_fd(fd)
 	end
 
 	-- 对应 TYPE_ERROR
 	function MSG.error(fd, msg)
-		if handler.error then
-			handler.error(fd, msg)
+		if fd == socket then
+			socketdriver.close(fd)
+			skynet.error(msg)
+		else
+			if handler.error then
+				handler.error(fd, msg)
+			end
+			close_fd(fd)
 		end
-		close_fd(fd)
 	end
 
 	-- 对应 TYPE_WARNING

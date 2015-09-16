@@ -142,18 +142,19 @@ end
 
 -- SKYNET_SOCKET_TYPE_ERROR = 5
 -- socket 产生错误
-socket_message[5] = function(id)
+socket_message[5] = function(id, _, err)
 	local s = socket_pool[id]
 	if s == nil then
-		skynet.error("socket: error on unknown", id)
+		skynet.error("socket: error on unknown", id, err)
 		return
 	end
 
-	if s.connected then
-		skynet.error("socket: error on", id)
+	if s.connected or s.connecting then
+		skynet.error("socket: error on", id, err)
 	end
 
 	s.connected = false
+	driver.close(id)
 
 	-- 唤醒协程
 	wakeup(s)
@@ -216,6 +217,7 @@ local function connect(id, func)
 		id = id,	-- socket id
 		buffer = newbuffer,	-- socket_buffer, 作为 listener 的 socket, newbuffer 为 nil.
 		connected = false,	-- 是否连接
+		connecting = true,	-- 正在连接
 
 		-- 有多个含义: 
 		-- nil or false: 表示当前没有在进行读取操作
@@ -235,6 +237,9 @@ local function connect(id, func)
 
 	-- 阻塞当前协程, 等待被唤醒
 	suspend(s)
+
+	-- 连接完成
+	s.connecting = nil
 
 	if s.connected then
 		return id
@@ -302,8 +307,8 @@ function socket.close(id)
 	end
 
 	if s.connected then
-		driver.close(s.id)
-		
+		driver.close(id)
+
 		-- notice: call socket.close in __gc should be carefully,
 		-- because skynet.wait never return in __gc, so driver.clear may not be called
 		-- 注意: 在 __gc 中调用 socket.close 应该是安全的,

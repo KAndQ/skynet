@@ -47,7 +47,11 @@ forward_message(int type, bool padding, struct socket_message * result) {
 	size_t sz = sizeof(*sm);
 	if (padding) {
 		if (result->data) {
-			sz += strlen(result->data);
+			size_t msg_sz = strlen(result->data);
+			if (msg_sz > 128) {
+				msg_sz = 128;
+			}
+			sz += msg_sz;
 		} else {
 			result->data = "";
 		}
@@ -107,7 +111,7 @@ skynet_socket_poll() {
 		forward_message(SKYNET_SOCKET_TYPE_CONNECT, true, &result);
 		break;
 	case SOCKET_ERROR:
-		forward_message(SKYNET_SOCKET_TYPE_ERROR, false, &result);
+		forward_message(SKYNET_SOCKET_TYPE_ERROR, true, &result);
 		break;
 	case SOCKET_ACCEPT:
 		// 当有其他 socket 连接到侦听的 socket, result->data 以 "xxx.xxx.xxx.xxx:端口号" 的格式保存连接方的地址信息, socket_server.buffer 的数据.

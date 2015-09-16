@@ -575,6 +575,7 @@ open_socket(struct socket_server * ss, struct request_open * request, struct soc
 	// 返回值: 0 成功, 非 0 出错
 	status = getaddrinfo(request->host, port, &ai_hints, &ai_list);
 	if (status != 0) {
+		result->data = (void *)gai_strerror(status);
 		goto _failed;
 	}
 
@@ -608,6 +609,7 @@ open_socket(struct socket_server * ss, struct request_open * request, struct soc
 	}
 
 	if (sock < 0) {
+		result->data = strerror(errno);
 		goto _failed;
 	}
 
@@ -615,6 +617,7 @@ open_socket(struct socket_server * ss, struct request_open * request, struct soc
 	ns = new_fd(ss, id, sock, PROTOCOL_TCP, request->opaque, true);
 	if (ns == NULL) {
 		close(sock);
+		result->data = "reach skynet socket number limit";
 		goto _failed;
 	}
 
@@ -1072,7 +1075,7 @@ _failed:
 	result->opaque = request->opaque;
 	result->id = id;
 	result->ud = 0;
-	result->data = NULL;
+	result->data = "reach skynet socket number limit";
 	ss->slot[HASH_ID(id)].type = SOCKET_TYPE_INVALID;
 
 	return SOCKET_ERROR;
@@ -1124,7 +1127,7 @@ bind_socket(struct socket_server *ss, struct request_bind *request, struct socke
 	result->ud = 0;
 	struct socket *s = new_fd(ss, id, request->fd, PROTOCOL_TCP, request->opaque, true);
 	if (s == NULL) {
-		result->data = NULL;
+		result->data = "reach skynet socket number limit";
 		return SOCKET_ERROR;
 	}
 
@@ -1146,13 +1149,16 @@ start_socket(struct socket_server *ss, struct request_start *request, struct soc
 	result->ud = 0;
 	result->data = NULL;
 	struct socket *s = &ss->slot[HASH_ID(id)];
+
 	if (s->type == SOCKET_TYPE_INVALID || s->id != id) {
+		result->data = "invalid socket";
 		return SOCKET_ERROR;
 	}
 
 	if (s->type == SOCKET_TYPE_PACCEPT || s->type == SOCKET_TYPE_PLISTEN) {
 		if (sp_add(ss->event_fd, s->fd, s)) {	// 添加到 event pool 中!!!
 			s->type = SOCKET_TYPE_INVALID;
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		s->type = (s->type == SOCKET_TYPE_PACCEPT) ? SOCKET_TYPE_CONNECTED : SOCKET_TYPE_LISTEN;
@@ -1257,7 +1263,7 @@ set_udp_address(struct socket_server *ss, struct request_setudp *request, struct
 		result->opaque = s->opaque;
 		result->id = s->id;
 		result->ud = 0;
-		result->data = NULL;
+		result->data = "protocol mismatch";
 
 		return SOCKET_ERROR;
 	}
@@ -1367,6 +1373,7 @@ forward_message_tcp(struct socket_server *ss, struct socket *s, struct socket_me
 			// close when error
 			// 其他错误将直接关闭掉 socket
 			force_close(ss, s, result);
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 
@@ -1455,6 +1462,7 @@ forward_message_udp(struct socket_server *ss, struct socket *s, struct socket_me
 			// close when error
 			// 其他错误将关闭掉这个 socket
 			force_close(ss, s, result);
+			result->data = strerror(errno);
 			return SOCKET_ERROR;
 		}
 		return -1;
@@ -1495,7 +1503,11 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 
 	// 如果 socket 出错, 那么将关闭掉该 socket
 	if (code < 0 || error) {  
+
 		force_close(ss, s, result);
+
+		result->data = strerror(errno);
+
 		return SOCKET_ERROR;
 
 	// 正确逻辑处理
@@ -1558,8 +1570,8 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 	}
 }
 
-// return 0 when failed
-// 失败的时候返回 0
+// return 0 when failed, or -1 when file limit
+// 失败的时候返回 0, 或者当到达文件限制时返回 -1
 
 /// 通过 accpet 得到连接的 socket, 成功返回 1, 否则返回 0
 static int
@@ -1580,7 +1592,15 @@ report_accept(struct socket_server *ss, struct socket *s, struct socket_message 
 
 	// 如果没有连接的 socket 函数直接返回
 	if (client_fd < 0) {
-		return 0;
+		if (errno == EMFILE || errno == ENFILE) {
+			result->opaque = s->opaque;
+			result->id = s->id;
+			result->ud = 0;
+			result->data = strerror(errno);
+			return -1;
+		} else {
+			return 0;
+		}
 	}
 
 	// 拿到一个可用的 socket id, 该 socket 已经标记为 SOCKET_TYPE_RESERVE
@@ -1702,11 +1722,17 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 		case SOCKET_TYPE_CONNECTING:	// 这个在之前也介绍过(open_socket), 正在连接主机, 这时接收到可读或者可写事件的时候则认为已经连接成功了
 			// 返回 SOCKET_ERROR, SOCKET_OPEN
 			return report_connect(ss, s, result);
-		case SOCKET_TYPE_LISTEN:		// 此时这个 socket 正在 listen
-			if (report_accept(ss, s, result)) {
+		case SOCKET_TYPE_LISTEN: {		// 此时这个 socket 正在 listen
+			int ok = report_accept(ss, s, result);
+			if (ok > 0) {
 				return SOCKET_ACCEPT;
+			} if (ok < 0 ) {
+				return SOCKET_ERROR;
 			}
+			// when ok == 0, retry
+			// 当 ok == 0, 重试
 			break;
+		}
 		case SOCKET_TYPE_INVALID:
 			fprintf(stderr, "socket-server: invalid socket\n");
 			break;
