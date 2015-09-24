@@ -10,7 +10,7 @@ local send_request
 
 local CMD = {}
 local REQUEST = {}
-local client_fd
+local client_fd		-- 连接的 socket
 
 function REQUEST:get()
 	print("get", self.what)
@@ -41,15 +41,17 @@ end
 
 local function send_package(pack)
 	local package = string.pack(">s2", pack)
-	socket.write(client_fd, package)
+	socket.write(client_fd, package)		-- 不同的服务可以 write
 end
 
 skynet.register_protocol {
 	name = "client",
 	id = skynet.PTYPE_CLIENT,
+
 	unpack = function (msg, sz)
 		return host:dispatch(msg, sz)
 	end,
+
 	dispatch = function (_, _, type, ...)
 		if type == "REQUEST" then
 			local ok, result  = pcall(request, ...)
@@ -68,12 +70,15 @@ skynet.register_protocol {
 }
 
 function CMD.start(conf)
-	local fd = conf.client
-	local gate = conf.gate
-	WATCHDOG = conf.watchdog
+	local fd = conf.client	-- socket id
+	local gate = conf.gate	-- gateserver handler
+	WATCHDOG = conf.watchdog	-- watchdog handler
+	
 	-- slot 1,2 set at main.lua
 	host = sprotoloader.load(1):host "package"
 	send_request = host:attach(sprotoloader.load(2))
+
+	-- 新开启 1 个协程, 每 5s 发送 1 次数据
 	skynet.fork(function()
 		while true do
 			send_package(send_request "heartbeat")
@@ -82,7 +87,7 @@ function CMD.start(conf)
 	end)
 
 	client_fd = fd
-	skynet.call(gate, "lua", "forward", fd)
+	skynet.call(gate, "lua", "forward", fd)	-- 告诉 gate 需要转发消息到当前 agent
 end
 
 function CMD.disconnect()
@@ -91,7 +96,7 @@ function CMD.disconnect()
 end
 
 skynet.start(function()
-	skynet.dispatch("lua", function(_,_, command, ...)
+	skynet.dispatch("lua", function(_, _, command, ...)
 		local f = CMD[command]
 		skynet.ret(skynet.pack(f(...)))
 	end)

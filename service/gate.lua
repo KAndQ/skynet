@@ -1,4 +1,5 @@
 -- gate.lua 是一个完整的网管服务器, 从 gateserver 接收到消息之后, 转发数据给 agent 服务.
+-- 对于发送给 watchdog 的 "socket" 类型消息是不需要返回的, 详细可以查看 watchdog.lua.
 
 local skynet = require "skynet"
 local gateserver = require "snax.gateserver"

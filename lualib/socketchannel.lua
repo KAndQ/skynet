@@ -43,7 +43,7 @@ local channel_socket_meta = {
 	end
 }
 
-local socket_error = setmetatable({}, {__tostring = function() return "[Error: socket]" end })	-- alias for error object, 用于错误的对象
+local socket_error = setmetatable({}, {__tostring = function() return "[Error: socket]" end })	-- alias for error object, 用于 socket 产生的错误
 socket_channel.error = socket_error
 
 -- 创建 channel 对象, desc 是 table 类型, 具体介绍查看: https://github.com/cloudwu/skynet/wiki/SocketChannel
