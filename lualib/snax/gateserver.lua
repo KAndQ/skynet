@@ -70,6 +70,7 @@ handler.warning(fd, size)
 --]]
 
 -- 启动一个网关服务
+-- @param handler table 类型, 如上定义
 function gateserver.start(handler)
 	
 	-- 必须存在的函数

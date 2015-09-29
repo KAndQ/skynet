@@ -1,3 +1,7 @@
+/**
+ * 针对跨平台, 对在 vs 下编程的通用整型类型定义
+ */
+
 #ifndef msvc_int_h
 #define msvc_int_h
 
