@@ -8,10 +8,18 @@
 	"buffers":
 	[
 		{
-			"file": "lualib/sprotoparser.lua",
+			"file": "lualib/sprotoloader.lua",
 			"settings":
 			{
-				"buffer_size": 10539,
+				"buffer_size": 869,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "lualib/sproto.lua",
+			"settings":
+			{
+				"buffer_size": 8257,
 				"line_ending": "Unix"
 			}
 		}
@@ -62,35 +70,39 @@
 	],
 	"file_history":
 	[
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sproto.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/sproto.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/lsproto.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/print_r.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/testrpc.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/test.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoloader.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/sproto.h",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoparser.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-crypt.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-netpack.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/gateserver.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/service_gate.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/service/gate.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socket.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-socket.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/msvcint.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/agent.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/client.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sproto.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoparser.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoloader.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/sproto.c",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/sproto.h",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/lsproto.c",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/gateserver.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-netpack.c",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/service/gate.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/watchdog.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/msgserver.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socketchannel.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/skynet.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socket.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/service_harbor.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_main.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/socket_server.c",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/service_gate.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/service/debug_agent.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/login/gated.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/databuffer.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/hashid.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_socket.c",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-socket.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/socket_server.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/loginserver.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-crypt.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/login/client.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/login/logind.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/loader.lua",
@@ -185,11 +197,7 @@
 		"/Users/zhenyuyao/enhance/Source/skynet/skynet-src/atomic.h",
 		"/Users/zhenyuyao/enhance/Source/skynet/service/clusterd.lua",
 		"/Users/zhenyuyao/enhance/Source/skynet/lualib/cluster.lua",
-		"/Users/zhenyuyao/enhance/Source/skynet/skynet-src/skynet_handle.h",
-		"/Users/zhenyuyao/enhance/Source/skynet/skynet-src/skynet_harbor.h",
-		"/Users/zhenyuyao/enhance/Source/skynet/skynet-src/skynet_harbor.c",
-		"/Users/zhenyuyao/enhance/Source/skynet/skynet-src/skynet_module.c",
-		"/Users/zhenyuyao/enhance/Source/skynet/skynet-src/skynet_mq.c"
+		"/Users/zhenyuyao/enhance/Source/skynet/skynet-src/skynet_handle.h"
 	],
 	"find":
 	{
@@ -208,6 +216,22 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			"__proto",
+			"attach",
+			"queryproto",
+			"querytype",
+			"sharenew",
+			"newsproto",
+			"netpack",
+			"lwrite",
+			"packvalue",
+			"count_lines",
+			"lpeg.match",
+			"proto",
+			"newline",
+			".parse",
+			"proto",
+			"lpeg",
 			"sproto",
 			"auth",
 			"handler.open",
@@ -319,23 +343,7 @@
 			"buffer_limit",
 			"login",
 			"write",
-			"assert_socket",
-			"skynet.start",
-			"start",
-			"filter_data",
-			"PTYPE",
-			"filter_data",
-			"filter_data_",
-			"TYPE_DATA",
-			"find_uncomplete",
-			"header",
-			"get_queue",
-			"filter_data",
-			"filter_data_",
-			"push_more",
-			"push_data",
-			"netpack",
-			"SMALLSTRING"
+			"assert_socket"
 		],
 		"highlight": true,
 		"in_selection": false,
@@ -358,19 +366,19 @@
 			[
 				{
 					"buffer": 0,
-					"file": "lualib/sprotoparser.lua",
+					"file": "lualib/sprotoloader.lua",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 10539,
+						"buffer_size": 869,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								10146,
-								10146
+								350,
+								350
 							]
 						],
 						"settings":
@@ -379,10 +387,39 @@
 							"translate_tabs_to_spaces": false
 						},
 						"translation.x": 0.0,
-						"translation.y": 7090.0,
+						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "lualib/sproto.lua",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 8257,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								288,
+								288
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Lua/Lua.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
 					"type": "text"
 				}
 			]
@@ -394,7 +431,7 @@
 	},
 	"input":
 	{
-		"height": 0.0
+		"height": 33.0
 	},
 	"layout":
 	{
@@ -437,6 +474,74 @@
 		"selected_items":
 		[
 			[
+				"sproto",
+				"lualib/sproto.lua"
+			],
+			[
+				"sprotoloader.lua",
+				"lualib/sprotoloader.lua"
+			],
+			[
+				"print_r",
+				"lualib-src/sproto/print_r.lua"
+			],
+			[
+				"print",
+				"lualib-src/sproto/print_r.lua"
+			],
+			[
+				"lsproto.c",
+				"lualib-src/sproto/lsproto.c"
+			],
+			[
+				"lsproto.lua",
+				"lualib/sproto.lua"
+			],
+			[
+				"sproto.c",
+				"lualib-src/sproto/sproto.c"
+			],
+			[
+				"lua-cty",
+				"lualib-src/lua-crypt.c"
+			],
+			[
+				"service_gate.c",
+				"service-src/service_gate.c"
+			],
+			[
+				"gate.lua",
+				"service/gate.lua"
+			],
+			[
+				"gateserver",
+				"lualib/snax/gateserver.lua"
+			],
+			[
+				"lua-netpack.c",
+				"lualib-src/lua-netpack.c"
+			],
+			[
+				"lua-socket.c",
+				"lualib-src/lua-socket.c"
+			],
+			[
+				"socket.lua",
+				"lualib/socket.lua"
+			],
+			[
+				"sproto.h",
+				"lualib-src/sproto/sproto.h"
+			],
+			[
+				"sproto.lua",
+				"lualib/sproto.lua"
+			],
+			[
+				"lspro",
+				"lualib-src/sproto/lsproto.c"
+			],
+			[
 				"sprotoparser.lua",
 				"lualib/sprotoparser.lua"
 			],
@@ -449,28 +554,12 @@
 				"examples/agent.lua"
 			],
 			[
-				"sproto",
-				"lualib-src/sproto/lsproto.c"
-			],
-			[
-				"sproto.c",
-				"lualib-src/sproto/sproto.c"
-			],
-			[
-				"lua-netpack.c",
-				"lualib-src/lua-netpack.c"
-			],
-			[
 				"gateserver.lua",
 				"lualib/snax/gateserver.lua"
 			],
 			[
 				"wt",
 				"examples/watchdog.lua"
-			],
-			[
-				"gate.lua",
-				"service/gate.lua"
 			],
 			[
 				"msgserver.lua",
@@ -499,10 +588,6 @@
 			[
 				"service_harbor.c",
 				"service-src/service_harbor.c"
-			],
-			[
-				"socket.lua",
-				"lualib/socket.lua"
 			],
 			[
 				"skynet.lua",
@@ -541,10 +626,6 @@
 				"lualib/snax/loginserver.lua"
 			],
 			[
-				"gateserver",
-				"lualib/snax/gateserver.lua"
-			],
-			[
 				"skynet_socket.c",
 				"skynet-src/skynet_socket.c"
 			],
@@ -567,10 +648,6 @@
 			[
 				"logind.lua",
 				"examples/login/logind.lua"
-			],
-			[
-				"lua-socket.c",
-				"lualib-src/lua-socket.c"
 			],
 			[
 				"lua-shareda",
@@ -861,10 +938,6 @@
 				"service-src/service_harbor.c"
 			],
 			[
-				"service_gate.c",
-				"service-src/service_gate.c"
-			],
-			[
 				"databuffer.h",
 				"service-src/databuffer.h"
 			],
@@ -911,42 +984,6 @@
 			[
 				"socket_serve.",
 				"skynet-src/socket_server.h"
-			],
-			[
-				"socket_epoll",
-				"skynet-src/socket_epoll.h"
-			],
-			[
-				"skynet_po",
-				"skynet-src/socket_poll.h"
-			],
-			[
-				"skynet_start.c",
-				"skynet-src/skynet_start.c"
-			],
-			[
-				"lua-skyn",
-				"lualib-src/lua-skynet.c"
-			],
-			[
-				"skynet_start",
-				"skynet-src/skynet_start.c"
-			],
-			[
-				"bootst",
-				"service/bootstrap.lua"
-			],
-			[
-				"debg",
-				"lualib/skynet/debug.lua"
-			],
-			[
-				"debug.lua",
-				"lualib/skynet/debug.lua"
-			],
-			[
-				"lua",
-				"lualib-src/lua-seri.c"
 			]
 		],
 		"width": 0.0
@@ -962,10 +999,14 @@
 	},
 	"select_symbol":
 	{
-		"height": 87.0,
-		"last_filter": "socket_server_send",
+		"height": 47.0,
+		"last_filter": "sproto_type",
 		"selected_items":
 		[
+			[
+				"sproto_type",
+				"sproto_type"
+			],
 			[
 				"socket_server_send",
 				"socket_server_send"
