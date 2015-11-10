@@ -46,6 +46,7 @@ spinlock_unlock(struct spinlock *lock) {
 /// 销毁锁
 static inline void
 spinlock_destroy(struct spinlock *lock) {
+	(void) lock;
 }
 
 #else

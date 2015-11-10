@@ -447,15 +447,16 @@ function skynet.yield()
 end
 
 -- 把当前 coroutine 挂起。通常这个函数需要结合 skynet.wakeup 使用。
-function skynet.wait()
+function skynet.wait(co)
 	-- 生成新的 session
 	local session = c.genid()
 
 	-- 阻塞当前协程, 程序回到 suspend
 	local ret, msg = coroutine_yield("SLEEP", session)
 
+	co = co or coroutine.running()
+
 	-- 删除 sleep 协程的记录
-	local co = coroutine.running()
 	sleep_session[co] = nil
 
 	-- 删除 session 与 coroutine 的关联
@@ -887,12 +888,16 @@ local function init_all()
 	end
 end
 
+local function ret(f, ...)
+	f()
+	return ...
+end
+
 -- service 初始化模板, 在 service 启动前执行的代码, start 参数是调用 skynet.start 传入的参数.
 local function init_template(start)
 	init_all()
 	init_func = {}
-	start()
-	init_all()
+	return ret(init_all, start())
 end
 
 -- 调用初始化模板函数

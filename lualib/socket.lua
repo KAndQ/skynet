@@ -37,7 +37,7 @@ local function suspend(s)
 	assert(not s.co)
 
 	s.co = coroutine.running()	-- 得到当前的 coroutine.
-	skynet.wait()	-- 把当前的 coroutine 挂起
+	skynet.wait(s.co)	-- 把当前的 coroutine 挂起
 
 	-- wakeup closing corouting every time suspend,
 	-- because socket.close() will wait last socket buffer operation before clear the buffer.
@@ -149,8 +149,10 @@ socket_message[5] = function(id, _, err)
 		return
 	end
 
-	if s.connected or s.connecting then
+	if s.connected then
 		skynet.error("socket: error on", id, err)
+	elseif s.connecting then
+		s.connecting = err
 	end
 
 	s.connected = false
@@ -239,12 +241,14 @@ local function connect(id, func)
 	suspend(s)
 
 	-- 连接完成
+	local err = s.connecting
 	s.connecting = nil
 
 	if s.connected then
 		return id
 	else
 		socket_pool[id] = nil
+		return nil, err
 	end
 end
 
@@ -320,7 +324,8 @@ function socket.close(id)
 			-- 等待正在读取的 buffer 读完缓存.
 			assert(not s.closing)
 			s.closing = coroutine.running()
-			skynet.wait()
+
+			skynet.wait(s.closing)
 		else	-- 没有 co, 直接等待 SKYNET_SOCKET_CLOSE 返回
 			suspend(s)
 		end
@@ -520,7 +525,7 @@ function socket.lock(id)
 	else	-- 之后的元素才插入协程
 		local co = coroutine.running()
 		table.insert(lock_set, co)
-		skynet.wait()
+		skynet.wait(co)
 	end
 end
 

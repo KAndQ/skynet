@@ -1503,11 +1503,11 @@ report_connect(struct socket_server *ss, struct socket *s, struct socket_message
 
 	// 如果 socket 出错, 那么将关闭掉该 socket
 	if (code < 0 || error) {  
-
-		force_close(ss, s, result);
-
-		result->data = strerror(errno);
-
+		force_close(ss,s, result);
+		if (code >= 0)
+			result->data = strerror(error);
+		else
+			result->data = strerror(errno);
 		return SOCKET_ERROR;
 
 	// 正确逻辑处理
@@ -1659,6 +1659,7 @@ clear_closed_event(struct socket_server *ss, struct socket_message * result, int
 			if (s) {
 				if (s->type == SOCKET_TYPE_INVALID && s->id == id) {
 					e->s = NULL;
+					break;
 				}
 			}
 		}
@@ -1755,7 +1756,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 					}
 				}
 
-				if (e->write) {
+				if (e->write && type != SOCKET_CLOSE && type != SOCKET_ERROR) {
 					// Try to dispatch write message next step if write flag set.
 					// 如果 write 为 true, 那么尝试在在下次循环的时候调度写信息操作
 					e->read = false;
@@ -1765,8 +1766,6 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				if (type == -1)
 					break;
 
-				// 对产生 SOCKET_ERROR 和 SOCKET_CLOSE 的 socket 并且关联着这个 socket 的 event 做处理
-				clear_closed_event(ss, result, type);
 				return type;
 			}
 
@@ -1777,9 +1776,7 @@ socket_server_poll(struct socket_server *ss, struct socket_message * result, int
 				
 				if (type == -1)
 					break;
-
-				// 对产生 SOCKET_ERROR 和 SOCKET_CLOSE 的 socket 并且关联着这个 socket 的 event 做处理
-				clear_closed_event(ss, result, type);
+				
 				return type;
 			}
 			break;

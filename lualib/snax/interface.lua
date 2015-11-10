@@ -95,9 +95,6 @@ return function (name, G, loader)
 		end
 	end
 
-	-- 设置 G 的原表, 这里很重要
-	setmetatable(G,	{ __index = env , __newindex = init_system })
-
 	-- 成功加载 snax 服务文件的模式
 	local pattern
 
@@ -125,12 +122,14 @@ return function (name, G, loader)
 			error(table.concat(errlist, "\n"))
 		end
 	end
+	
+	-- 删除 G 的元表
+	setmetatable(G,	{ __index = env , __newindex = init_system })
 
 	-- 执行 snax 服务
-	mainfunc()
-
-	-- 删除 G 的元表
+	local ok, err = pcall(mainfunc)
 	setmetatable(G, nil)
+	assert(ok,err)
 
 	-- temp_global 的数据复制给 G, 因为之前 G 无论是获得还是更新, 都是使用元表方法. 无法操作自身这个表
 	for k, v in pairs(temp_global) do

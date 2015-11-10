@@ -31,6 +31,7 @@ static int
 codecache(lua_State *L) {
 	luaL_Reg l[] = {
 		{ "clear", cleardummy },
+		{ "mode", cleardummy },
 		{ NULL, NULL },
 	};
 	luaL_newlib(L,l);

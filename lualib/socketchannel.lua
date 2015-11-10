@@ -169,7 +169,14 @@ end
 
 -- 基于协议模式一, 弹出 result 和协程
 local function pop_response(self)
-	return table.remove(self.__request, 1), table.remove(self.__thread, 1)
+	while true do
+		local func,co = table.remove(self.__request, 1), table.remove(self.__thread, 1)
+		if func then
+			return func, co
+		end
+		self.__wait_response = coroutine.running()
+		skynet.wait(self.__wait_response)
+	end
 end
 
 -- 压入响应.
@@ -185,6 +192,10 @@ local function push_response(self, response, co)
 		-- response 是 1 个函数, 将它压入到 __request 中
 		table.insert(self.__request, response)
 		table.insert(self.__thread, co)
+		if self.__wait_response then
+			skynet.wakeup(self.__wait_response)
+			self.__wait_response = nil
+		end
 	end
 end
 
@@ -192,54 +203,43 @@ end
 local function dispatch_by_order(self)
 	while self.__sock do
 		local func, co = pop_response(self)
-		if func == nil then
-			if not socket.block(self.__sock[1]) then	-- 确认当前的 socket 是否有效, 如果无效就 close socket
-				close_channel_socket(self)
-				wakeup_all(self)
-			end
-		else
-			local ok, result_ok, result_data, padding = pcall(func, self.__sock)	-- 注意, 这里有可能会阻塞
-			--[[
+		local ok, result_ok, result_data, padding = pcall(func, self.__sock)	-- 注意, 这里有可能会阻塞
+		--[[
 			返回值介绍: 
 			ok: 函数调用是否发生 error;
 			result_ok: 包是否解析正确;
 			result_data: 回应内容;
 			padding: 表明了后续是否还有该长消息的后续部分。
-			--]]
+		--]]
 
-			if ok then
-				if padding and result_ok then
-					-- if padding is true, wait for next result_data
-					-- self.__result_data[co] is a table
-					-- 如果 padding 为 true, 等待下一个 result_data
-					-- self.__result_data[co] 是一个 table
-					local result = self.__result_data[co] or {}
-					self.__result_data[co] = result
-					table.insert(result, result_data)
-				else
-					self.__result[co] = result_ok
-					if result_ok and self.__result_data[co] then
-						table.insert(self.__result_data[co], result_data)
-					else
-						self.__result_data[co] = result_data
-					end
-					skynet.wakeup(co)
-				end
+		if ok then
+			if padding and result_ok then
+				-- if padding is true, wait for next result_data
+				-- self.__result_data[co] is a table
+				-- 如果 padding 为 true, 等待下一个 result_data
+				-- self.__result_data[co] 是一个 table
+				local result = self.__result_data[co] or {}
+				self.__result_data[co] = result
+				table.insert(result, result_data)
 			else
-				close_channel_socket(self)
-
-				local errmsg
-				if result_ok ~= socket_error then
-					errmsg = result_ok
+				self.__result[co] = result_ok
+				if result_ok and self.__result_data[co] then
+					table.insert(self.__result_data[co], result_data)
+				else
+					self.__result_data[co] = result_data
 				end
-
-				-- 因为这个 co 已经不在序列中了, 所以需要单独处理
-				self.__result[co] = socket_error
-				self.__result_data[co] = errmsg
 				skynet.wakeup(co)
-
-				wakeup_all(self, errmsg)
 			end
+		else
+			close_channel_socket(self)
+			local errmsg
+			if result_ok ~= socket_error then
+				errmsg = result_ok
+			end
+			self.__result[co] = socket_error
+			self.__result_data[co] = errmsg
+			skynet.wakeup(co)
+			wakeup_all(self, errmsg)
 		end
 	end
 end
@@ -290,11 +290,11 @@ local function connect_once(self)
 
 	-- 连接主机, 如果 __host 和 __port 的连接无效, 使用 __backup 的配置连接,
 	-- 如果都连接无效就返回.
-	local fd = socket.open(self.__host, self.__port)
+	local fd, err = socket.open(self.__host, self.__port)
 	if not fd then
 		fd = connect_backup(self)
 		if not fd then
-			return false
+			return false, err
 		end
 	end
 
@@ -338,13 +338,16 @@ end
 local function try_connect(self, once)
 	local t = 0
 	while not self.__closed do
-		if connect_once(self) then
+		local ok, err = connect_once(self)
+		if ok then
 			if not once then
 				skynet.error("socket: connect to", self.__host, self.__port)
 			end
-			return true
+			return
 		elseif once then
-			return false
+			return err
+		else
+			skynet.error("socket: connect", err)
 		end
 
 		-- 在连接不成功的情况下, 延长挂起时间, 最大不超过 11s(每 11s 打印一次信息).
@@ -386,17 +389,18 @@ local function block_connect(self, once)
 	if r ~= nil then
 		return r
 	end
+	local err
 
 	if #self.__connecting > 0 then
 		-- connecting in other coroutine
 		-- 尝试连接的其他协程, 只是记录协程, 但是不执行连接操作
 		local co = coroutine.running()
 		table.insert(self.__connecting, co)
-		skynet.wait()
+		skynet.wait(co)
 	else
 		-- 实际进行连接的协程
 		self.__connecting[1] = true
-		try_connect(self, once)
+		err = try_connect(self, once)
 		self.__connecting[1] = nil
 
 		-- 唤醒其他的 connect 协程
@@ -409,7 +413,7 @@ local function block_connect(self, once)
 
 	r = check_connection(self)
 	if r == nil then
-		error(string.format("Connect to %s:%d failed", self.__host, self.__port))
+		error(string.format("Connect to %s:%d failed (%s)", self.__host, self.__port, err))
 	else
 		return r
 	end
@@ -432,7 +436,7 @@ local function wait_for_response(self, response)
 	push_response(self, response, co)
 	
 	-- 阻塞, 等待响应时唤醒
-	skynet.wait()
+	skynet.wait(co)
 
 	-- 拿到结果
 	local result = self.__result[co]

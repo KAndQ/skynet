@@ -96,7 +96,6 @@ function gateserver.start(handler)
 	function CMD.close()
 		assert(socket)
 		socketdriver.close(socket)
-		socket = nil
 	end
 
 	-- 用于 socket 协议处理函数的集合
@@ -166,6 +165,8 @@ function gateserver.start(handler)
 				handler.disconnect(fd)
 			end
 			close_fd(fd)
+		else
+			socket = nil
 		end
 	end
 

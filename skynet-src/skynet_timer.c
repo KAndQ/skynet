@@ -336,10 +336,9 @@ timer_create_timer() {
 
 int
 skynet_timeout(uint32_t handle, int time, int session) {
-
 	// 因为 time 参数是 0, 所以没必要再添加到计时器中,
 	// 直接将信息压入到对应的 skynet_context 中.
-	if (time == 0) {
+	if (time <= 0) {
 		struct skynet_message message;
 		message.source = 0;
 		message.session = session;

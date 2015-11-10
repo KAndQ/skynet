@@ -176,7 +176,12 @@ _ctrl(struct gate * g, const void * msg, int sz) {
 		return;
 	}
 	if (memcmp(command,"start",i) == 0) {	// start listen socket, skynet_socket 必须要 start 之后才能使用
-		skynet_socket_start(ctx, g->listen_id);
+		_parm(tmp, sz, i);
+		int uid = strtol(command , NULL, 10);
+		int id = hashid_lookup(&g->hash, uid);
+		if (id>=0) {
+			skynet_socket_start(ctx, uid);
+		}
 		return;
 	}
 	if (memcmp(command, "close", i) == 0) {	// close listen socket.
@@ -287,10 +292,7 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 		}
 
 		int id = hashid_lookup(&g->hash, message->id);
-		if (id >= 0) {
-			struct connection *c = &g->conn[id];
-			_report(g, "%d open %d %s:0", message->id, message->id, c->remote_name);
-		} else {
+		if (id<0) {
 			skynet_error(ctx, "Close unknown connection %d", message->id);
 			skynet_socket_close(ctx, message->id);
 		}
@@ -322,13 +324,12 @@ dispatch_socket_message(struct gate *g, const struct skynet_socket_message * mes
 			if (sz >= sizeof(c->remote_name)) {
 				sz = sizeof(c->remote_name) - 1;
 			}
-			memcpy(c->remote_name, message+1, sz);
-			c->remote_name[sz] = '\0';
-
 			// 记录连接的 socket id
 			c->id = message->ud;
-
-			skynet_socket_start(ctx, message->ud);
+			memcpy(c->remote_name, message+1, sz);
+			c->remote_name[sz] = '\0';
+			_report(g, "%d open %d %s:0",c->id, c->id, c->remote_name);
+			skynet_error(ctx, "socket open: %x", c->id);
 		}
 		break;
 	case SKYNET_SOCKET_TYPE_WARNING:
@@ -369,7 +370,6 @@ _cb(struct skynet_context * ctx, void * ud, int type, int session, uint32_t sour
 		}
 	}
 	case PTYPE_SOCKET:
-		assert(source == 0);
 		// recv socket message from skynet_socket
 		// 从 skynet_socket 接收 socket 消息
 		dispatch_socket_message(g, msg, (int)(sz - sizeof(struct skynet_socket_message)));
@@ -408,7 +408,7 @@ start_listen(struct gate * g, char * listen_addr) {
 	if (g->listen_id < 0) {
 		return 1;
 	}
-
+	skynet_socket_start(ctx, g->listen_id);
 	return 0;
 }
 
@@ -420,14 +420,14 @@ gate_init(struct gate *g , struct skynet_context * ctx, char * parm) {
 
 	// 获得传入的参数
 	int max = 0;
-	int buffer = 0;
 	int sz = strlen(parm)+1;
 	char watchdog[sz];
 	char binding[sz];
 	int client_tag = 0;
 	char header;
-	int n = sscanf(parm, "%c %s %s %d %d %d", &header, watchdog, binding, &client_tag, &max, &buffer);
-	if (n < 4) {
+
+	int n = sscanf(parm, "%c %s %s %d %d", &header, watchdog, binding, &client_tag, &max);
+	if (n<4) {
 		skynet_error(ctx, "Invalid gate parm %s", parm);
 		return 1;
 	}

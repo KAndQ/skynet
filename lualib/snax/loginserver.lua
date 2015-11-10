@@ -100,7 +100,6 @@ local function launch_slave(auth_handler)
 
 	-- 与 client 的认证逻辑
 	local function auth(fd, addr)
-		fd = assert(tonumber(fd))
 		skynet.error(string.format("connect from %s (fd = %d)", addr, fd))
 		socket.start(fd)
 
@@ -144,12 +143,12 @@ local function launch_slave(auth_handler)
 
 		local ok, server, uid = pcall(auth_handler, token)
 
-		socket.abandon(fd)
 		return ok, server, uid, secret
 	end
 
 	-- 结果返回给 login server 的 master 服务
-	local function ret_pack(ok, err, ...)
+	local function ret_pack(fd, ok, err, ...)
+		socket.abandon(fd)
 		if ok then
 			skynet.ret(skynet.pack(err, ...))
 		else
@@ -162,8 +161,12 @@ local function launch_slave(auth_handler)
 	end
 
 	-- 注册 lua 协议, 可以查看下面的 accept 函数, 它发送 fd 和 addr 给 slave
-	skynet.dispatch("lua", function(_, _, ...)
-		ret_pack(pcall(auth, ...))
+	skynet.dispatch("lua", function(_,_,fd,...)
+		if type(fd) ~= "number" then
+			skynet.ret(skynet.pack(false, "invalid fd type"))
+		else
+			ret_pack(fd,pcall(auth, fd, ...))
+		end
 	end)
 end
 
