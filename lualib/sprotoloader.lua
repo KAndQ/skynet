@@ -8,22 +8,29 @@ local sproto = require "sproto"
 
 local loader = {}
 
+-- 将文件内的内容解析为二进制数据存储起来
+-- @param filename 文件名, 存储的 index, 以用来查询
 function loader.register(filename, index)
 	local f = assert(io.open(filename), "Can't open sproto file")
 	local data = f:read "a"
 	f:close()
-	local sp = core.newproto(parser.parse(data))
+	local sp = core.newproto(parser.parse(data))	-- cobj
 	core.saveproto(sp, index)
 end
 
+-- 将 sprotoparser.parse 解析后的二进制数据存储起来
+-- @param bin sprotoparser.parse 解析出来的数据
+-- @param index 存储的 index, 以用来查询
 function loader.save(bin, index)
-	local sp = core.newproto(bin)
+	local sp = core.newproto(bin)	-- cobj
 	core.saveproto(sp, index)
 end
 
 -- 在每个 vm 内，都可以通过 sprotoloader.load 把协议加载到 vm 中
+-- @param index 使用之前存储的使用的 index
+-- @return sproto 对象
 function loader.load(index)
-	local sp = core.loadproto(index)
+	local sp = core.loadproto(index)	-- cobj
 	--  no __gc in metatable
 	return sproto.sharenew(sp)
 end
