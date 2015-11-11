@@ -175,6 +175,7 @@ _ctrl(struct gate * g, const void * msg, int sz) {
 		g->broker = skynet_queryname(ctx, command);
 		return;
 	}
+	
 	if (memcmp(command,"start",i) == 0) {	// start listen socket, skynet_socket 必须要 start 之后才能使用
 		_parm(tmp, sz, i);
 		int uid = strtol(command , NULL, 10);

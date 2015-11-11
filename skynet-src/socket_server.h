@@ -51,6 +51,9 @@ void socket_server_exit(struct socket_server *);
 /// 请求关闭指定的 socket
 void socket_server_close(struct socket_server *, uintptr_t opaque, int id);
 
+/// 直接关闭一个 socket
+void socket_server_shutdown(struct socket_server *, uintptr_t opaque, int id);
+
 /// 请求打开一个 socket, socket 在 start 之后才能被操作
 void socket_server_start(struct socket_server *, uintptr_t opaque, int id);
 

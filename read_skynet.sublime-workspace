@@ -7,30 +7,6 @@
 	},
 	"buffers":
 	[
-		{
-			"file": "service-src/service_gate.c",
-			"settings":
-			{
-				"buffer_size": 12150,
-				"line_ending": "Unix"
-			}
-		},
-		{
-			"file": "service-src/service_harbor.c",
-			"settings":
-			{
-				"buffer_size": 24056,
-				"line_ending": "Unix"
-			}
-		},
-		{
-			"file": "skynet-src/skynet_timer.c",
-			"settings":
-			{
-				"buffer_size": 12495,
-				"line_ending": "Unix"
-			}
-		}
 	],
 	"build_system": "",
 	"build_system_choices":
@@ -78,34 +54,35 @@
 	],
 	"file_history":
 	[
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoloader.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/lsproto.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sproto.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socket.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/interface.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoparser.lua",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/msvcint.h",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/service_gate.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/service_harbor.c",
+		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_timer.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/socket_server.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/skynet.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/loginserver.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socket.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/socketchannel.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/interface.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/skynet/queue.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sproto.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoloader.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/sproto.c",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/lsproto.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/print_r.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/testrpc.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/test.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/sproto.h",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/sprotoparser.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-crypt.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-netpack.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/gateserver.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/service_gate.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/service/gate.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-socket.c",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto/msvcint.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/agent.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/client.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/watchdog.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib/snax/msgserver.lua",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/service-src/service_harbor.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_main.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/service/debug_agent.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/login/gated.lua",
@@ -165,7 +142,6 @@
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_socket.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/lua-seri.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/examples/config",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_timer.c",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/service/clusterproxy.lua",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_timer.h",
 		"/Users/zhenyuyao/enhance/Source/read_skynet/skynet-src/skynet_mq.c",
@@ -224,6 +200,9 @@
 		"case_sensitive": false,
 		"find_history":
 		[
+			">>>>>>>",
+			"default",
+			"newproto",
 			">>>>>>>",
 			");\n",
 			">>>>>>>",
@@ -348,10 +327,7 @@
 			"get_queue",
 			"socket_error",
 			"command_handler",
-			"login_handler",
-			"command_handler",
-			"auth_handler",
-			"SERVICE_NAME"
+			"login_handler"
 		],
 		"highlight": true,
 		"in_selection": false,
@@ -369,96 +345,8 @@
 	"groups":
 	[
 		{
-			"selected": 2,
 			"sheets":
 			[
-				{
-					"buffer": 0,
-					"file": "service-src/service_gate.c",
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 12150,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								11327,
-								11327
-							]
-						],
-						"settings":
-						{
-							"syntax": "Packages/C++/C++.tmLanguage",
-							"translate_tabs_to_spaces": false
-						},
-						"translation.x": 0.0,
-						"translation.y": 7875.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 2,
-					"type": "text"
-				},
-				{
-					"buffer": 1,
-					"file": "service-src/service_harbor.c",
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 24056,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								10726,
-								10726
-							]
-						],
-						"settings":
-						{
-							"syntax": "Packages/C++/C++.tmLanguage",
-							"translate_tabs_to_spaces": false
-						},
-						"translation.x": 0.0,
-						"translation.y": 7335.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 1,
-					"type": "text"
-				},
-				{
-					"buffer": 2,
-					"file": "skynet-src/skynet_timer.c",
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 12495,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								9043,
-								9043
-							]
-						],
-						"settings":
-						{
-							"syntax": "Packages/C++/C++.tmLanguage",
-							"translate_tabs_to_spaces": false
-						},
-						"translation.x": 0.0,
-						"translation.y": 7101.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 0,
-					"type": "text"
-				}
 			]
 		}
 	],
@@ -510,6 +398,22 @@
 		"last_filter": "",
 		"selected_items":
 		[
+			[
+				"lsproto.c",
+				"lualib-src/sproto/lsproto.c"
+			],
+			[
+				"sprotoparser",
+				"lualib/sprotoparser.lua"
+			],
+			[
+				"sproto.lua",
+				"lualib/sproto.lua"
+			],
+			[
+				"msvcint",
+				"lualib-src/sproto/msvcint.h"
+			],
 			[
 				"skynet_timer.c",
 				"skynet-src/skynet_timer.c"
@@ -571,10 +475,6 @@
 				"lualib-src/sproto/print_r.lua"
 			],
 			[
-				"lsproto.c",
-				"lualib-src/sproto/lsproto.c"
-			],
-			[
 				"lsproto.lua",
 				"lualib/sproto.lua"
 			],
@@ -605,10 +505,6 @@
 			[
 				"sproto.h",
 				"lualib-src/sproto/sproto.h"
-			],
-			[
-				"sproto.lua",
-				"lualib/sproto.lua"
 			],
 			[
 				"lspro",
@@ -1013,14 +909,6 @@
 			[
 				"mongo.lua",
 				"lualib/mongo.lua"
-			],
-			[
-				"reids.lua",
-				"lualib/redis.lua"
-			],
-			[
-				"dns.lua",
-				"lualib/dns.lua"
 			]
 		],
 		"width": 0.0

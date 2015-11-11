@@ -756,6 +756,14 @@ lclose(lua_State *L) {
  * lua: 接收 3 个参数, 参数 1, 主机地址; 参数 2, 端口; 参数 3, backlog, 如果不传此参数, 将使用默认值; 1 个返回值, socket id
  */
 static int
+lshutdown(lua_State *L) {
+	int id = luaL_checkinteger(L,1);
+	struct skynet_context * ctx = lua_touserdata(L, lua_upvalueindex(1));
+	skynet_socket_shutdown(ctx, id);
+	return 0;
+}
+
+static int
 llisten(lua_State *L) {
 	const char * host = luaL_checkstring(L,1);
 	int port = luaL_checkinteger(L,2);
@@ -1017,6 +1025,7 @@ luaopen_socketdriver(lua_State *L) {
 	luaL_Reg l2[] = {
 		{ "connect", lconnect },
 		{ "close", lclose },
+		{ "shutdown", lshutdown },
 		{ "listen", llisten },
 		{ "send", lsend },
 		{ "lsend", lsendlow },

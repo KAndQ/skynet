@@ -77,6 +77,18 @@ local function querytype(self, typename)
 	return v
 end
 
+-- 判断一个类型是否存在
+-- @param typename 类型的名字
+-- @return true 存在, 否则不存在
+function sproto:exist_type(typename)
+	local v = self.__tcache[typename]
+	if not v then
+		return core.querytype(self.__cobj, typename) ~= nil
+	else
+		return true
+	end
+end
+
 -- encodes a lua table by a type object, and generates a string message.
 -- 将 1 个 table 通过类型对象编码, 然后返回 1 个字符串消息.
 -- @param typename 类型名字
@@ -140,6 +152,18 @@ local function queryproto(self, pname)
 	end
 
 	return v
+end
+
+-- 判断一个协议是否存在
+-- @param pname 协议名字
+-- @return true 存在, false 不存在
+function sproto:exist_proto(pname)
+	local v = self.__pcache[pname]
+	if not v then
+		return core.protocol(self.__cobj, pname) ~= nil
+	else
+		return true
+	end
 end
 
 -- 将协议请求编码

@@ -53,6 +53,9 @@ int skynet_socket_bind(struct skynet_context *ctx, int fd);
 /// 关闭 socket
 void skynet_socket_close(struct skynet_context *ctx, int id);
 
+/// 直接关闭一个 socket
+void skynet_socket_shutdown(struct skynet_context *ctx, int id);
+
 /// 开启指定的 socket
 void skynet_socket_start(struct skynet_context *ctx, int id);
 

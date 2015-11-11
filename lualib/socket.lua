@@ -156,7 +156,7 @@ socket_message[5] = function(id, _, err)
 	end
 
 	s.connected = false
-	driver.close(id)
+	driver.shutdown(id)
 
 	-- 唤醒协程
 	wakeup(s)
@@ -285,7 +285,7 @@ end
 
 -- 强行关闭一个连接。和 close 不同的是，它不会等待可能存在的其它 coroutine 的读操作。
 -- 一般不建议使用这个 API ，但如果你需要在 __gc 元方法中关闭连接的话，shutdown 是一个比 close 更好的选择（因为在 gc 过程中无法切换 coroutine）。
-function socket.shutdown(id)
+local function close_fd(id, func)
 	local s = socket_pool[id]
 	if s then
 
@@ -295,9 +295,14 @@ function socket.shutdown(id)
 		end
 
 		if s.connected then
-			driver.close(id)
+			func(id)
 		end
 	end
+end
+
+-- 强行关闭 socket, 不会阻塞当前协程
+function socket.shutdown(id)
+	close_fd(id, driver.shutdown)
 end
 
 -- 关闭一个连接，这个 API 有可能阻塞住执行流。
@@ -318,13 +323,12 @@ function socket.close(id)
 		-- 注意: 在 __gc 中调用 socket.close 应该是安全的,
 		-- 因为 skynet.wait 不会在 __gc 中返回, 所以 driver.clear 可能不会被调用.
 		if s.co then	-- 等待 co 处理完
-			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediatel
+			-- reading this socket on another coroutine, so don't shutdown (clear the buffer) immediately
 			-- wait reading coroutine read the buffer.
 			-- 这个 socket 可能在另外一个协程正在读取, 所以不要立即关闭(清除 buffer),
 			-- 等待正在读取的 buffer 读完缓存.
 			assert(not s.closing)
 			s.closing = coroutine.running()
-
 			skynet.wait(s.closing)
 		else	-- 没有 co, 直接等待 SKYNET_SOCKET_CLOSE 返回
 			suspend(s)
@@ -332,7 +336,7 @@ function socket.close(id)
 		s.connected = false
 	end
 
-	socket.shutdown(id)
+	close_fd(id)	-- clear the buffer (already close fd)
 
 	-- 保证已经没有协程在阻塞了
 	assert(s.lock_set == nil or next(s.lock_set) == nil)

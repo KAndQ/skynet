@@ -41,7 +41,7 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 	va_start(ap,msg);
 	int len = vsnprintf(tmp, LOG_MESSAGE_SIZE, msg, ap);
 	va_end(ap);
-	if (len < LOG_MESSAGE_SIZE) {
+	if (len >=0 && len < LOG_MESSAGE_SIZE) {
 		data = skynet_strdup(tmp);
 	} else {
 		int max_size = LOG_MESSAGE_SIZE;
@@ -58,6 +58,11 @@ skynet_error(struct skynet_context * context, const char *msg, ...) {
 			}
 			skynet_free(data);
 		}
+	}
+	if (len < 0) {
+		skynet_free(data);
+		perror("vsnprintf error :");
+		return;
 	}
 
 	// 发送 skynet_message 给 logger 服务, skynet_message 里面携带了格式化后的数据

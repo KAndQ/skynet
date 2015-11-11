@@ -453,10 +453,10 @@ function skynet.wait(co)
 
 	-- 阻塞当前协程, 程序回到 suspend
 	local ret, msg = coroutine_yield("SLEEP", session)
-
+	
+	-- 删除 sleep 协程的记录
 	co = co or coroutine.running()
 
-	-- 删除 sleep 协程的记录
 	sleep_session[co] = nil
 
 	-- 删除 session 与 coroutine 的关联

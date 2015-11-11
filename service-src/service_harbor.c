@@ -394,7 +394,7 @@ forward_local_messsage(struct harbor *h, void *msg, int sz) {
 	message_to_header((const uint32_t *)cookie, &header);
 
 	uint32_t destination = header.destination;
-	
+
 	// 获得消息类型, 高 8 位存储消息类型
 	int type = destination >> HANDLE_REMOTE_SHIFT;
 

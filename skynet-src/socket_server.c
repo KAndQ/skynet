@@ -163,6 +163,7 @@ struct request_setudp {
 /// 关闭 socket
 struct request_close {
 	int id;	// socket id
+	int shutdown;
 	uintptr_t opaque;
 };
 
@@ -1104,9 +1105,9 @@ close_socket(struct socket_server *ss, struct request_close *request, struct soc
 			return type;
 	}
 
-	// 如果发送链表为空了, 那么释放 socket 的资源
-	if (send_buffer_empty(s)) {
-		force_close(ss, s, result);
+	// 如果发送链表为空了, 或者标记了 shutdown, 那么释放 socket 的资源
+	if (request->shutdown || send_buffer_empty(s)) {
+		force_close(ss,s,result);
 		result->id = id;
 		result->opaque = request->opaque;
 		return SOCKET_CLOSE;
@@ -1913,6 +1914,17 @@ socket_server_close(struct socket_server *ss, uintptr_t opaque, int id) {
 	// 生成 request_close
 	struct request_package request;
 	request.u.close.id = id;
+	request.u.close.shutdown = 0;
+	request.u.close.opaque = opaque;
+	send_request(ss, &request, 'K', sizeof(request.u.close));
+}
+
+
+void
+socket_server_shutdown(struct socket_server *ss, uintptr_t opaque, int id) {
+	struct request_package request;
+	request.u.close.id = id;
+	request.u.close.shutdown = 1;
 	request.u.close.opaque = opaque;
 
 	// 将 request_close 写入管道中

@@ -159,7 +159,7 @@ local function launch_slave(auth_handler)
 			end
 		end
 	end
-
+	
 	-- 注册 lua 协议, 可以查看下面的 accept 函数, 它发送 fd 和 addr 给 slave
 	skynet.dispatch("lua", function(_,_,fd,...)
 		if type(fd) ~= "number" then

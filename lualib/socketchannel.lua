@@ -211,7 +211,6 @@ local function dispatch_by_order(self)
 			result_data: 回应内容;
 			padding: 表明了后续是否还有该长消息的后续部分。
 		--]]
-
 		if ok then
 			if padding and result_ok then
 				-- if padding is true, wait for next result_data
