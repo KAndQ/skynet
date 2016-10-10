@@ -7,6 +7,24 @@
 	},
 	"buffers":
 	[
+		{
+			"file": "skynet-src/skynet_server.c",
+			"settings":
+			{
+				"buffer_size": 26408,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"file": "examples/config",
+			"settings":
+			{
+				"buffer_size": 2999,
+				"encoding": "UTF-8",
+				"line_ending": "Windows"
+			}
+		}
 	],
 	"build_system": "",
 	"build_system_choices":
@@ -47,10 +65,8 @@
 	},
 	"expanded_folders":
 	[
-		"/Users/zhenyuyao/enhance/Source/read_skynet",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src",
-		"/Users/zhenyuyao/enhance/Source/read_skynet/lualib-src/sproto"
+		"/E/source/read_skynet/skynet",
+		"/E/source/read_skynet/skynet/examples"
 	],
 	"file_history":
 	[
@@ -345,8 +361,66 @@
 	"groups":
 	[
 		{
+			"selected": 1,
 			"sheets":
 			[
+				{
+					"buffer": 0,
+					"file": "skynet-src/skynet_server.c",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 26408,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								2486,
+								2486
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/C++/C.sublime-syntax",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": -0.0,
+						"translation.y": 1716.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "examples/config",
+					"semi_transient": true,
+					"settings":
+					{
+						"buffer_size": 2999,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								511,
+								511
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Lua/Lua.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 264.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				}
 			]
 		}
 	],
@@ -380,7 +454,7 @@
 			1.0
 		]
 	},
-	"menu_visible": true,
+	"menu_visible": false,
 	"output.find_results":
 	{
 		"height": 0.0
@@ -398,6 +472,10 @@
 		"last_filter": "",
 		"selected_items":
 		[
+			[
+				"skynet_server",
+				"skynet-src\\skynet_server.c"
+			],
 			[
 				"lsproto.c",
 				"lualib-src/sproto/lsproto.c"
@@ -685,10 +763,6 @@
 			[
 				"snlua.c",
 				"service-src/service_snlua.c"
-			],
-			[
-				"skynet_server",
-				"skynet-src/skynet_server.c"
 			],
 			[
 				"manager.lua",
